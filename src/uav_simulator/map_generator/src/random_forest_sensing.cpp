@@ -425,6 +425,7 @@ int main(int argc, char **argv)
     node->declare_parameter("ObstacleShape/z_l", 7.0);
     node->declare_parameter("ObstacleShape/z_h", 7.0);
     node->declare_parameter("ObstacleShape/theta", 7.0);
+    node->declare_parameter("ObstacleShape/seed", -1.0);
 
     node->declare_parameter("sensing/radius", 10.0);
     node->declare_parameter("sensing/rate", 10.0);
@@ -465,8 +466,9 @@ int main(int argc, char **argv)
     rclcpp::sleep_for(std::chrono::milliseconds(500));
 
     // 初始化随机数生成器
-    unsigned int seed = rd();
-    // unsigned int seed = 2433201515;
+    double seed_param = -1.0;
+    node->get_parameter("ObstacleShape/seed", seed_param);
+    unsigned int seed = seed_param >= 0.0 ? static_cast<unsigned int>(seed_param) : rd();
     std::cout << "seed=" << seed << std::endl;
     eng.seed(seed);
 

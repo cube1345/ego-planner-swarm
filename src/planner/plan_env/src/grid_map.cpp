@@ -40,6 +40,13 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/depth_hit_scale", 1.0);
   node_->declare_parameter("grid_map/depth_miss_scale", 1.0);
   node_->declare_parameter("grid_map/fusion_conflict_scale", 0.3);
+  node_->declare_parameter("grid_map/depth_decay_distance", 5.0);
+  node_->declare_parameter("grid_map/depth_min_scale", 1.0);
+  node_->declare_parameter("grid_map/lidar_decay_distance", 12.0);
+  node_->declare_parameter("grid_map/lidar_min_scale", 1.0);
+  node_->declare_parameter("grid_map/publish_conflict_cloud", false);
+  node_->declare_parameter("grid_map/enable_fusion_stats", false);
+  node_->declare_parameter("grid_map/fusion_stats_path", "/tmp/grid_map_fusion_stats.csv");
   node_->declare_parameter("grid_map/p_min", 0.12);
   node_->declare_parameter("grid_map/p_max", 0.97);
   node_->declare_parameter("grid_map/p_occ", 0.80);
@@ -87,6 +94,13 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/depth_hit_scale", mp_.depth_hit_scale_);
   node_->get_parameter("grid_map/depth_miss_scale", mp_.depth_miss_scale_);
   node_->get_parameter("grid_map/fusion_conflict_scale", mp_.fusion_conflict_scale_);
+  node_->get_parameter("grid_map/depth_decay_distance", mp_.depth_decay_distance_);
+  node_->get_parameter("grid_map/depth_min_scale", mp_.depth_min_scale_);
+  node_->get_parameter("grid_map/lidar_decay_distance", mp_.lidar_decay_distance_);
+  node_->get_parameter("grid_map/lidar_min_scale", mp_.lidar_min_scale_);
+  node_->get_parameter("grid_map/publish_conflict_cloud", mp_.publish_conflict_cloud_);
+  node_->get_parameter("grid_map/enable_fusion_stats", mp_.enable_fusion_stats_);
+  node_->get_parameter("grid_map/fusion_stats_path", mp_.fusion_stats_path_);
   node_->get_parameter("grid_map/p_min", mp_.p_min_);
   node_->get_parameter("grid_map/p_max", mp_.p_max_);
   node_->get_parameter("grid_map/p_occ", mp_.p_occ_);
@@ -147,10 +161,16 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.depth_dist_sum_ = vector<float>(buffer_size, 0.0f);
   md_.lidar_dist_sum_ = vector<float>(buffer_size, 0.0f);
   md_.flag_fusion_ = vector<char>(buffer_size, 0);
+  md_.fused_voxel_count_ = 0;
+  md_.conflict_voxel_count_ = 0;
   md_.flag_rayend_ = vector<char>(buffer_size, -1);
   md_.flag_traverse_ = vector<char>(buffer_size, -1);
 
   md_.raycast_num_ = 0;
+  md_.last_fusion_stats_time_ = node_->now();
+  md_.last_fused_voxel_count_ = 0;
+  md_.last_conflict_voxel_count_ = 0;
+  md_.last_conflict_ratio_ = 0.0;
 
   md_.proj_points_.resize(640 * 480 / mp_.skip_pixel_ / mp_.skip_pixel_);
   md_.proj_points_cnt = 0;
@@ -213,6 +233,16 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   // 发布者
   map_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("grid_map/occupancy", 10);
   map_inf_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("grid_map/occupancy_inflate", 10);
+  conflict_pub_ = node_->create_publisher<sensor_msgs::msg::PointCloud2>("grid_map/conflict", 10);
+
+  if (mp_.enable_fusion_stats_ && !mp_.fusion_stats_path_.empty())
+  {
+    fusion_stats_file_.open(mp_.fusion_stats_path_, std::ios::out | std::ios::trunc);
+    if (fusion_stats_file_.is_open())
+    {
+      fusion_stats_file_ << "time,fused_voxels,conflict_voxels,conflict_ratio\n";
+    }
+  }
 
   md_.occ_need_update_ = false;
   md_.local_updated_ = false;
@@ -375,9 +405,15 @@ void GridMap::projectDepthImage()
         depth = (*row_ptr++) / mp_.k_depth_scaling_factor_;
         proj_pt(0) = (u - mp_.cx_) * depth / mp_.fx_;
         proj_pt(1) = (v - mp_.cy_) * depth / mp_.fy_;
-        proj_pt(2) = depth;
-
-        proj_pt = camera_r * proj_pt + md_.camera_pos_;
+    if (md_.flag_use_depth_fusion && (node_->now() - md_.last_occ_update_time_).seconds() > mp_.odom_depth_timeout_)
+    {
+      RCLCPP_ERROR(node_->get_logger(),
+                   "odom or depth lost! now=%f, last_occ_update_time=%f, odom_depth_timeout=%f",
+                   node_->now().seconds(),
+                   md_.last_occ_update_time_.seconds(),
+                   mp_.odom_depth_timeout_);
+      md_.flag_depth_odom_timeout_ = true;
+    }
 
         if (u == 320 && v == 240)
           std::cout << "depth: " << depth << std::endl;
@@ -480,8 +516,23 @@ void GridMap::raycastProcess()
   rclcpp::Time t1, t2;
 
   md_.raycast_num_ += 1;
+  md_.last_fusion_stats_time_ = node_->now();
+  md_.last_fused_voxel_count_ = 0;
+  md_.last_conflict_voxel_count_ = 0;
+  md_.last_conflict_ratio_ = 0.0;
 
   int vox_idx;
+    if (mp_.enable_fusion_stats_ && fusion_stats_file_.is_open())
+    {
+      double dt = (node_->now() - md_.last_fusion_stats_time_).seconds();
+      if (dt >= 1.0)
+      {
+        fusion_stats_file_ << node_->now().seconds() << "," << md_.last_fused_voxel_count_ << ","
+                           << md_.last_conflict_voxel_count_ << "," << md_.last_conflict_ratio_ << "\n";
+        fusion_stats_file_.flush();
+        md_.last_fusion_stats_time_ = node_->now();
+      }
+    }
   double length;
 
   // bounding box of updated region
@@ -596,8 +647,19 @@ void GridMap::raycastProcess()
 
 void GridMap::fuseAndUpdateOccupancy()
 {
+  md_.fused_voxel_count_ = 0;
+  md_.conflict_voxel_count_ = 0;
+  if (mp_.publish_conflict_cloud_)
+    md_.conflict_voxels_.clear();
+
   if (md_.cache_voxel_.empty())
+  {
+    md_.last_fused_voxel_count_ = 0;
+    md_.last_conflict_voxel_count_ = 0;
+    md_.last_conflict_ratio_ = 0.0;
+    RCLCPP_DEBUG(node_->get_logger(), "fusion: no voxels");
     return;
+  }
 
   Eigen::Vector3d local_range_min = md_.camera_pos_ - mp_.local_update_range_;
   Eigen::Vector3d local_range_max = md_.camera_pos_ + mp_.local_update_range_;
@@ -658,6 +720,9 @@ void GridMap::fuseAndUpdateOccupancy()
     if (depth_update * lidar_update < 0.0)
     {
       log_odds_update *= mp_.fusion_conflict_scale_;
+      md_.conflict_voxel_count_ += 1;
+      if (mp_.publish_conflict_cloud_)
+        md_.conflict_voxels_.push_back(idx);
     }
     if (log_odds_update == 0.0)
       continue;
@@ -682,7 +747,30 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.occupancy_buffer_[idx_ctns] =
         std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
                  mp_.clamp_max_log_);
+    md_.fused_voxel_count_ += 1;
   }
+
+  double ratio = md_.fused_voxel_count_ > 0
+                     ? static_cast<double>(md_.conflict_voxel_count_) / md_.fused_voxel_count_
+                     : 0.0;
+  md_.last_fused_voxel_count_ = md_.fused_voxel_count_;
+  md_.last_conflict_voxel_count_ = md_.conflict_voxel_count_;
+  md_.last_conflict_ratio_ = ratio;
+
+  if (mp_.enable_fusion_stats_ && fusion_stats_file_.is_open())
+  {
+    double dt = (node_->now() - md_.last_fusion_stats_time_).seconds();
+    if (dt >= 1.0)
+    {
+      fusion_stats_file_ << node_->now().seconds() << "," << md_.last_fused_voxel_count_ << ","
+                         << md_.last_conflict_voxel_count_ << "," << md_.last_conflict_ratio_ << "\n";
+      fusion_stats_file_.flush();
+      md_.last_fusion_stats_time_ = node_->now();
+    }
+  }
+  RCLCPP_INFO_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                       "fusion: fused=%d conflict=%d ratio=%.4f",
+                       md_.fused_voxel_count_, md_.conflict_voxel_count_, ratio);
 }
 
 Eigen::Vector3d GridMap::closetPointInMap(const Eigen::Vector3d &pt, const Eigen::Vector3d &camera_pt)
@@ -840,6 +928,40 @@ void GridMap::visCallback()
 {
   publishMapInflate(true);
   publishMap();
+  if (mp_.publish_conflict_cloud_)
+    publishConflictMap();
+}
+
+void GridMap::publishConflictMap()
+{
+  if (conflict_pub_->get_subscription_count() <= 0)
+    return;
+
+  if (md_.conflict_voxels_.empty())
+    return;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  cloud.reserve(md_.conflict_voxels_.size());
+
+  for (const auto &idx : md_.conflict_voxels_)
+  {
+    Eigen::Vector3d pos;
+    indexToPos(idx, pos);
+    pcl::PointXYZ pt;
+    pt.x = pos(0);
+    pt.y = pos(1);
+    pt.z = pos(2);
+    cloud.push_back(pt);
+  }
+
+  cloud.width = cloud.points.size();
+  cloud.height = 1;
+  cloud.is_dense = true;
+  cloud.header.frame_id = mp_.frame_id_;
+
+  sensor_msgs::msg::PointCloud2 cloud_msg;
+  pcl::toROSMsg(cloud, cloud_msg);
+  conflict_pub_->publish(cloud_msg);
 }
 
 void GridMap::updateOccupancyCallback()
@@ -849,6 +971,17 @@ void GridMap::updateOccupancyCallback()
 
   if (!md_.occ_need_update_)
   {
+    if (mp_.enable_fusion_stats_ && fusion_stats_file_.is_open())
+    {
+      double dt = (node_->now() - md_.last_fusion_stats_time_).seconds();
+      if (dt >= 1.0)
+      {
+        fusion_stats_file_ << node_->now().seconds() << "," << md_.last_fused_voxel_count_ << ","
+                           << md_.last_conflict_voxel_count_ << "," << md_.last_conflict_ratio_ << "\n";
+        fusion_stats_file_.flush();
+        md_.last_fusion_stats_time_ = node_->now();
+      }
+    }
     if (md_.flag_use_depth_fusion &&
         (node_->now() - md_.last_occ_update_time_).seconds() > mp_.odom_depth_timeout_)
     {

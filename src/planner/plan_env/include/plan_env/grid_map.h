@@ -6,6 +6,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <iostream>
+#include <fstream>
 #include <random>
 #include <nav_msgs/msg/odometry.hpp>
 #include <queue>
@@ -90,6 +91,13 @@ struct MappingParameters
   double depth_hit_scale_;
   double depth_miss_scale_;
   double fusion_conflict_scale_;
+  double depth_decay_distance_;
+  double depth_min_scale_;
+  double lidar_decay_distance_;
+  double lidar_min_scale_;
+  bool publish_conflict_cloud_;
+  bool enable_fusion_stats_;
+  string fusion_stats_path_;
 
   /* local map update and clear */
   int local_map_margin_;
@@ -150,6 +158,9 @@ struct MappingData
   vector<float> depth_dist_sum_;
   vector<float> lidar_dist_sum_;
   vector<char> flag_fusion_;
+  vector<Eigen::Vector3i> conflict_voxels_;
+  int fused_voxel_count_;
+  int conflict_voxel_count_;
   vector<char> flag_traverse_, flag_rayend_;
   char raycast_num_;
   queue<Eigen::Vector3i> cache_voxel_;
@@ -162,6 +173,10 @@ struct MappingData
 
   double fuse_time_, max_fuse_time_;
   int update_num_;
+  rclcpp::Time last_fusion_stats_time_;
+  int last_fused_voxel_count_;
+  int last_conflict_voxel_count_;
+  double last_conflict_ratio_;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -247,6 +262,7 @@ private:
   void integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud);
   void fuseAndUpdateOccupancy();
   void enqueueFusionVoxel(const Eigen::Vector3i &id);
+  void publishConflictMap();
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
@@ -279,6 +295,9 @@ private:
 
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_inf_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr conflict_pub_;
+
+  std::ofstream fusion_stats_file_;
 
   rclcpp::TimerBase::SharedPtr occ_timer_;
   rclcpp::TimerBase::SharedPtr vis_timer_;
