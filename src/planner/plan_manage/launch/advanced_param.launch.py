@@ -14,6 +14,7 @@ def generate_launch_description():
     camera_pose_topic = LaunchConfiguration('camera_pose_topic', default='camera_pose')
     depth_topic = LaunchConfiguration('depth_topic', default='depth_image')
     cloud_topic = LaunchConfiguration('cloud_topic', default='cloud')
+    lidar_topic = LaunchConfiguration('lidar_topic', default='lidar_points')
     
     cx = LaunchConfiguration('cx', default=321.04638671875)
     cy = LaunchConfiguration('cy', default=243.44969177246094)
@@ -56,6 +57,7 @@ def generate_launch_description():
     camera_pose_topic_arg = DeclareLaunchArgument('camera_pose_topic', default_value=camera_pose_topic, description='Camera pose topic')
     depth_topic_arg = DeclareLaunchArgument('depth_topic', default_value=depth_topic, description='Depth topic')
     cloud_topic_arg = DeclareLaunchArgument('cloud_topic', default_value=cloud_topic, description='Point cloud topic')
+    lidar_topic_arg = DeclareLaunchArgument('lidar_topic', default_value=lidar_topic, description='LiDAR point cloud topic')
     cx_arg = DeclareLaunchArgument('cx', default_value=cx, description='Camera intrinsic cx')
     cy_arg = DeclareLaunchArgument('cy', default_value=cy, description='Camera intrinsic cy')
     fx_arg = DeclareLaunchArgument('fx', default_value=fx, description='Camera intrinsic fx')
@@ -107,6 +109,7 @@ def generate_launch_description():
             
             ('grid_map/odom', ['drone_', drone_id, '_', odometry_topic]),
             ('grid_map/cloud', ['drone_', drone_id, '_', cloud_topic]),
+            ('grid_map/lidar', ['drone_', drone_id, '_', lidar_topic]),
             ('grid_map/pose', ['drone_', drone_id, '_', camera_pose_topic]),
             ('grid_map/depth', ['drone_', drone_id, '_', depth_topic]),
             ('grid_map/occupancy_inflate', ['drone_', drone_id, '_grid/grid_map/occupancy_inflate'])
@@ -169,6 +172,9 @@ def generate_launch_description():
             {'grid_map/p_occ': 0.80},
             {'grid_map/min_ray_length': 0.1},
             {'grid_map/max_ray_length': 4.5},
+
+            {'grid_map/lidar_min_range': 0.2},
+            {'grid_map/lidar_max_range': 10.0},
             
             {'grid_map/virtual_ceil_height': 2.9},
             {'grid_map/visualization_truncate_height': 1.8},
@@ -217,6 +223,7 @@ def generate_launch_description():
     ld.add_action(camera_pose_topic_arg)
     ld.add_action(depth_topic_arg)
     ld.add_action(cloud_topic_arg)
+    ld.add_action(lidar_topic_arg)
     ld.add_action(cx_arg)
     ld.add_action(cy_arg)
     ld.add_action(fx_arg)

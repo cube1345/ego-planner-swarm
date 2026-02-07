@@ -28,6 +28,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/depth_filter_margin", -1);
   node_->declare_parameter("grid_map/k_depth_scaling_factor", -1.0);
   node_->declare_parameter("grid_map/skip_pixel", -1);
+  node_->declare_parameter("grid_map/lidar_max_range", 10.0);
+  node_->declare_parameter("grid_map/lidar_min_range", 0.2);
   node_->declare_parameter("grid_map/p_hit", 0.70);
   node_->declare_parameter("grid_map/p_miss", 0.35);
   node_->declare_parameter("grid_map/p_min", 0.12);
@@ -65,6 +67,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/depth_filter_margin", mp_.depth_filter_margin_);
   node_->get_parameter("grid_map/k_depth_scaling_factor", mp_.k_depth_scaling_factor_);
   node_->get_parameter("grid_map/skip_pixel", mp_.skip_pixel_);
+  node_->get_parameter("grid_map/lidar_max_range", mp_.lidar_max_range_);
+  node_->get_parameter("grid_map/lidar_min_range", mp_.lidar_min_range_);
   node_->get_parameter("grid_map/p_hit", mp_.p_hit_);
   node_->get_parameter("grid_map/p_miss", mp_.p_miss_);
   node_->get_parameter("grid_map/p_min", mp_.p_min_);
@@ -167,6 +171,9 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   // 使用独立的里程计和点云订阅
   indep_cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
       "grid_map/cloud", 10, std::bind(&GridMap::cloudCallback, this, std::placeholders::_1));
+
+    lidar_cloud_sub_ = node_->create_subscription<sensor_msgs::msg::PointCloud2>(
+      "grid_map/lidar", 10, std::bind(&GridMap::inputPointCloud, this, std::placeholders::_1));
 
   indep_odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
       "grid_map/odom", 10, std::bind(&GridMap::odomCallback, this, std::placeholders::_1));
@@ -912,6 +919,190 @@ void GridMap::cloudCallback(const sensor_msgs::msg::PointCloud2::ConstPtr &img)
         md_.occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
       }
   }
+}
+
+void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+  if (!msg)
+    return;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud_input;
+  pcl::fromROSMsg(*msg, cloud_input);
+
+  if (cloud_input.points.empty())
+    return;
+
+  if (!md_.has_odom_)
+  {
+    RCLCPP_WARN(node_->get_logger(), "lidar input but no odom");
+    return;
+  }
+
+  if (isnan(md_.camera_pos_(0)) || isnan(md_.camera_pos_(1)) || isnan(md_.camera_pos_(2)))
+    return;
+
+  Eigen::Vector3d sensor_pos = md_.camera_pos_;
+
+  md_.raycast_num_ += 1;
+
+  RayCaster raycaster;
+  Eigen::Vector3d half = Eigen::Vector3d(0.5, 0.5, 0.5);
+  Eigen::Vector3d ray_pt, pt_w;
+
+  double min_x = mp_.map_max_boundary_(0);
+  double min_y = mp_.map_max_boundary_(1);
+  double min_z = mp_.map_max_boundary_(2);
+
+  double max_x = mp_.map_min_boundary_(0);
+  double max_y = mp_.map_min_boundary_(1);
+  double max_z = mp_.map_min_boundary_(2);
+
+  for (const auto &pt : cloud_input.points)
+  {
+    if (isnan(pt.x) || isnan(pt.y) || isnan(pt.z))
+      continue;
+
+    pt_w = Eigen::Vector3d(pt.x, pt.y, pt.z);
+    double dist = (pt_w - sensor_pos).norm();
+
+    if (dist < mp_.lidar_min_range_ || dist > mp_.lidar_max_range_)
+      continue;
+
+    int vox_idx;
+
+    if (!isInMap(pt_w))
+    {
+      pt_w = closetPointInMap(pt_w, sensor_pos);
+      dist = (pt_w - sensor_pos).norm();
+
+      if (dist > mp_.lidar_max_range_)
+      {
+        pt_w = (pt_w - sensor_pos) / dist * mp_.lidar_max_range_ + sensor_pos;
+      }
+      vox_idx = setCacheOccupancy(pt_w, 0);
+    }
+    else
+    {
+      if (dist > mp_.lidar_max_range_)
+      {
+        pt_w = (pt_w - sensor_pos) / dist * mp_.lidar_max_range_ + sensor_pos;
+        vox_idx = setCacheOccupancy(pt_w, 0);
+      }
+      else
+      {
+        vox_idx = setCacheOccupancy(pt_w, 1);
+      }
+    }
+
+    max_x = max(max_x, pt_w(0));
+    max_y = max(max_y, pt_w(1));
+    max_z = max(max_z, pt_w(2));
+
+    min_x = min(min_x, pt_w(0));
+    min_y = min(min_y, pt_w(1));
+    min_z = min(min_z, pt_w(2));
+
+    if (vox_idx != INVALID_IDX)
+    {
+      if (md_.flag_rayend_[vox_idx] == md_.raycast_num_)
+      {
+        continue;
+      }
+      else
+      {
+        md_.flag_rayend_[vox_idx] = md_.raycast_num_;
+      }
+    }
+
+    raycaster.setInput(pt_w / mp_.resolution_, sensor_pos / mp_.resolution_);
+
+    while (raycaster.step(ray_pt))
+    {
+      Eigen::Vector3d tmp = (ray_pt + half) * mp_.resolution_;
+      double length = (tmp - sensor_pos).norm();
+
+      if (length < mp_.lidar_min_range_)
+        continue;
+
+      vox_idx = setCacheOccupancy(tmp, 0);
+
+      if (vox_idx != INVALID_IDX)
+      {
+        if (md_.flag_traverse_[vox_idx] == md_.raycast_num_)
+        {
+          break;
+        }
+        else
+        {
+          md_.flag_traverse_[vox_idx] = md_.raycast_num_;
+        }
+      }
+    }
+  }
+
+  min_x = min(min_x, sensor_pos(0));
+  min_y = min(min_y, sensor_pos(1));
+  min_z = min(min_z, sensor_pos(2));
+
+  max_x = max(max_x, sensor_pos(0));
+  max_y = max(max_y, sensor_pos(1));
+  max_z = max(max_z, sensor_pos(2));
+  max_z = max(max_z, mp_.ground_height_);
+
+  posToIndex(Eigen::Vector3d(max_x, max_y, max_z), md_.local_bound_max_);
+  posToIndex(Eigen::Vector3d(min_x, min_y, min_z), md_.local_bound_min_);
+  boundIndex(md_.local_bound_min_);
+  boundIndex(md_.local_bound_max_);
+
+  md_.local_updated_ = true;
+
+  Eigen::Vector3d local_range_min = sensor_pos - mp_.local_update_range_;
+  Eigen::Vector3d local_range_max = sensor_pos + mp_.local_update_range_;
+
+  Eigen::Vector3i min_id, max_id;
+  posToIndex(local_range_min, min_id);
+  posToIndex(local_range_max, max_id);
+  boundIndex(min_id);
+  boundIndex(max_id);
+
+  while (!md_.cache_voxel_.empty())
+  {
+    Eigen::Vector3i idx = md_.cache_voxel_.front();
+    int idx_ctns = toAddress(idx);
+    md_.cache_voxel_.pop();
+
+    double log_odds_update =
+        md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns] ? mp_.prob_hit_log_ : mp_.prob_miss_log_;
+
+    md_.count_hit_[idx_ctns] = md_.count_hit_and_miss_[idx_ctns] = 0;
+
+    if (log_odds_update >= 0 && md_.occupancy_buffer_[idx_ctns] >= mp_.clamp_max_log_)
+    {
+      continue;
+    }
+    else if (log_odds_update <= 0 && md_.occupancy_buffer_[idx_ctns] <= mp_.clamp_min_log_)
+    {
+      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
+      continue;
+    }
+
+    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) &&
+                    idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
+    if (!in_local)
+    {
+      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
+    }
+
+    md_.occupancy_buffer_[idx_ctns] =
+        std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
+                 mp_.clamp_max_log_);
+  }
+
+  if (md_.local_updated_)
+    clearAndInflateLocalMap();
+
+  md_.local_updated_ = false;
+  md_.last_occ_update_time_ = node_->now();
 }
 
 void GridMap::publishMap()

@@ -10,6 +10,7 @@
 #include <nav_msgs/msg/odometry.hpp>
 #include <queue>
 #include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tuple>
 #include <visualization_msgs/msg/marker.hpp>
 
@@ -71,6 +72,10 @@ struct MappingParameters
   bool use_depth_filter_;
   double k_depth_scaling_factor_;
   int skip_pixel_;
+
+  /* lidar parameters */
+  double lidar_max_range_;
+  double lidar_min_range_;
 
   /* raycasting */
   double p_hit_, p_miss_, p_min_, p_max_, p_occ_; // occupancy probability
@@ -195,6 +200,9 @@ public:
   int getVoxelNum();
   bool getOdomDepthTimeout() { return md_.flag_depth_odom_timeout_; }
 
+  // lidar point cloud input
+  void inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
+
   typedef std::shared_ptr<GridMap> Ptr;
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -243,6 +251,7 @@ private:
   SynchronizerImageOdom sync_image_odom_;
 
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr indep_cloud_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_cloud_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr indep_odom_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr extrinsic_sub_;
 

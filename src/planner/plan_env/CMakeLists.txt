@@ -27,6 +27,7 @@ find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
+find_package(pcl_ros REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -58,7 +59,7 @@ add_library( plan_env SHARED
     src/obj_predictor.cpp 
     )
 
-ament_target_dependencies(plan_env std_msgs visualization_msgs geometry_msgs nav_msgs rclcpp Eigen3 PCL cv_bridge message_filters pcl_conversions)
+ament_target_dependencies(plan_env std_msgs visualization_msgs geometry_msgs nav_msgs rclcpp Eigen3 PCL cv_bridge message_filters pcl_conversions pcl_ros)
 
 target_link_libraries( plan_env 
   ${PCL_LIBRARIES}
@@ -68,7 +69,7 @@ target_link_libraries( plan_env
 add_executable(obj_generator
     src/obj_generator.cpp 
 )
-ament_target_dependencies(obj_generator std_msgs visualization_msgs geometry_msgs nav_msgs rclcpp Eigen3 PCL cv_bridge message_filters pcl_conversions)
+ament_target_dependencies(obj_generator std_msgs visualization_msgs geometry_msgs nav_msgs rclcpp Eigen3 PCL cv_bridge message_filters pcl_conversions pcl_ros)
 
 install(TARGETS plan_env
         DESTINATION lib
