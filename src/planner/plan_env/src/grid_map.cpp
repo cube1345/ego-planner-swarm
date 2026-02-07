@@ -30,8 +30,14 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/skip_pixel", -1);
   node_->declare_parameter("grid_map/lidar_max_range", 10.0);
   node_->declare_parameter("grid_map/lidar_min_range", 0.2);
+  node_->declare_parameter("grid_map/lidar_sync_tolerance", 0.1);
+  node_->declare_parameter("grid_map/lidar_hit_scale", 1.0);
+  node_->declare_parameter("grid_map/lidar_miss_scale", 1.0);
+  node_->declare_parameter("grid_map/use_lidar_buffer", false);
   node_->declare_parameter("grid_map/p_hit", 0.70);
   node_->declare_parameter("grid_map/p_miss", 0.35);
+  node_->declare_parameter("grid_map/depth_hit_scale", 1.0);
+  node_->declare_parameter("grid_map/depth_miss_scale", 1.0);
   node_->declare_parameter("grid_map/p_min", 0.12);
   node_->declare_parameter("grid_map/p_max", 0.97);
   node_->declare_parameter("grid_map/p_occ", 0.80);
@@ -69,8 +75,14 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/skip_pixel", mp_.skip_pixel_);
   node_->get_parameter("grid_map/lidar_max_range", mp_.lidar_max_range_);
   node_->get_parameter("grid_map/lidar_min_range", mp_.lidar_min_range_);
+  node_->get_parameter("grid_map/lidar_sync_tolerance", mp_.lidar_sync_tolerance_);
+  node_->get_parameter("grid_map/lidar_hit_scale", mp_.lidar_hit_scale_);
+  node_->get_parameter("grid_map/lidar_miss_scale", mp_.lidar_miss_scale_);
+  node_->get_parameter("grid_map/use_lidar_buffer", mp_.use_lidar_buffer_);
   node_->get_parameter("grid_map/p_hit", mp_.p_hit_);
   node_->get_parameter("grid_map/p_miss", mp_.p_miss_);
+  node_->get_parameter("grid_map/depth_hit_scale", mp_.depth_hit_scale_);
+  node_->get_parameter("grid_map/depth_miss_scale", mp_.depth_miss_scale_);
   node_->get_parameter("grid_map/p_min", mp_.p_min_);
   node_->get_parameter("grid_map/p_max", mp_.p_max_);
   node_->get_parameter("grid_map/p_occ", mp_.p_occ_);
@@ -198,6 +210,9 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.has_cloud_ = false;
   md_.image_cnt_ = 0;
   md_.last_occ_update_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
+  md_.last_depth_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
+  md_.last_lidar_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
+  md_.has_lidar_ = false;
 
   md_.fuse_time_ = 0.0;
   md_.update_num_ = 0;
@@ -529,7 +544,9 @@ void GridMap::raycastProcess()
     md_.cache_voxel_.pop();
 
     double log_odds_update =
-        md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns] ? mp_.prob_hit_log_ : mp_.prob_miss_log_;
+      md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns]
+        ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
+        : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
 
     md_.count_hit_[idx_ctns] = md_.count_hit_and_miss_[idx_ctns] = 0;
 
@@ -743,6 +760,19 @@ void GridMap::updateOccupancyCallback()
   raycastProcess();
   // t3 = ros::Time::now();
 
+  if (mp_.use_lidar_buffer_ && md_.has_lidar_)
+  {
+    if (md_.last_depth_time_.nanoseconds() > 0 && md_.last_lidar_time_.nanoseconds() > 0)
+    {
+      double dt = fabs((md_.last_depth_time_ - md_.last_lidar_time_).seconds());
+      if (dt <= mp_.lidar_sync_tolerance_)
+      {
+        integrateLidarCloud(md_.last_lidar_cloud_, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+      }
+    }
+    md_.has_lidar_ = false;
+  }
+
   if (md_.local_updated_)
     clearAndInflateLocalMap();
 
@@ -765,6 +795,8 @@ void GridMap::updateOccupancyCallback()
 void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const geometry_msgs::msg::PoseStamped::ConstPtr &pose)
 {
+  md_.last_depth_time_ = img->header.stamp;
+
   /* get depth image */
   cv_bridge::CvImagePtr cv_ptr;
   cv_ptr = cv_bridge::toCvCopy(img, img->encoding);
@@ -921,22 +953,16 @@ void GridMap::cloudCallback(const sensor_msgs::msg::PointCloud2::ConstPtr &img)
   }
 }
 
-void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, double hit_scale, double miss_scale)
 {
-  if (!msg)
-    return;
-
-  pcl::PointCloud<pcl::PointXYZ> cloud_input;
-  pcl::fromROSMsg(*msg, cloud_input);
-
-  if (cloud_input.points.empty())
-    return;
-
   if (!md_.has_odom_)
   {
     RCLCPP_WARN(node_->get_logger(), "lidar input but no odom");
     return;
   }
+
+  if (cloud.points.empty())
+    return;
 
   if (isnan(md_.camera_pos_(0)) || isnan(md_.camera_pos_(1)) || isnan(md_.camera_pos_(2)))
     return;
@@ -957,7 +983,7 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
   double max_y = mp_.map_min_boundary_(1);
   double max_z = mp_.map_min_boundary_(2);
 
-  for (const auto &pt : cloud_input.points)
+  for (const auto &pt : cloud.points)
   {
     if (isnan(pt.x) || isnan(pt.y) || isnan(pt.z))
       continue;
@@ -1072,7 +1098,9 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
     md_.cache_voxel_.pop();
 
     double log_odds_update =
-        md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns] ? mp_.prob_hit_log_ : mp_.prob_miss_log_;
+        md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns]
+            ? mp_.prob_hit_log_ * hit_scale
+            : mp_.prob_miss_log_ * miss_scale;
 
     md_.count_hit_[idx_ctns] = md_.count_hit_and_miss_[idx_ctns] = 0;
 
@@ -1097,6 +1125,29 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
         std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
                  mp_.clamp_max_log_);
   }
+}
+
+void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+{
+  if (!msg)
+    return;
+
+  md_.last_lidar_time_ = msg->header.stamp;
+
+  pcl::PointCloud<pcl::PointXYZ> cloud_input;
+  pcl::fromROSMsg(*msg, cloud_input);
+
+  if (cloud_input.points.empty())
+    return;
+
+  if (mp_.use_lidar_buffer_)
+  {
+    md_.last_lidar_cloud_ = cloud_input;
+    md_.has_lidar_ = true;
+    return;
+  }
+
+  integrateLidarCloud(cloud_input, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
 
   if (md_.local_updated_)
     clearAndInflateLocalMap();
@@ -1236,6 +1287,8 @@ void GridMap::extrinsicCallback(const nav_msgs::msg::Odometry::ConstPtr &odom)
 void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const nav_msgs::msg::Odometry::ConstPtr &odom)
 {
+  md_.last_depth_time_ = img->header.stamp;
+
   /* get pose */
   Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
                                                  odom->pose.pose.orientation.x,

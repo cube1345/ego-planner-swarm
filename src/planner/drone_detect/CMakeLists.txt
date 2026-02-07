@@ -21,6 +21,7 @@ find_package(std_srvs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(CURL REQUIRED)
 find_package(Boost REQUIRED)
 find_package(message_filters REQUIRED)
 
@@ -50,6 +51,7 @@ add_executable(drone_detect
 target_compile_features(drone_detect PUBLIC cxx_std_17)
 
 ament_target_dependencies(drone_detect rclcpp sensor_msgs nav_msgs geometry_msgs std_srvs cv_bridge Eigen3 OpenCV Boost message_filters)
+target_link_libraries(drone_detect CURL::libcurl)
 
 # Install targets
 install(

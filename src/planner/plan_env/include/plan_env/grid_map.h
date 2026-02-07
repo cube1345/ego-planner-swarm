@@ -76,12 +76,18 @@ struct MappingParameters
   /* lidar parameters */
   double lidar_max_range_;
   double lidar_min_range_;
+  double lidar_sync_tolerance_;
+  double lidar_hit_scale_;
+  double lidar_miss_scale_;
+  bool use_lidar_buffer_;
 
   /* raycasting */
   double p_hit_, p_miss_, p_min_, p_max_, p_occ_; // occupancy probability
   double prob_hit_log_, prob_miss_log_, clamp_min_log_, clamp_max_log_,
       min_occupancy_log_;                  // logit of occupancy probability
   double min_ray_length_, max_ray_length_; // range of doing raycasting
+  double depth_hit_scale_;
+  double depth_miss_scale_;
 
   /* local map update and clear */
   int local_map_margin_;
@@ -122,8 +128,12 @@ struct MappingData
 
   // odom_depth_timeout_
   rclcpp::Time last_occ_update_time_;
+  rclcpp::Time last_depth_time_;
+  rclcpp::Time last_lidar_time_;
   bool flag_depth_odom_timeout_;
   bool flag_use_depth_fusion;
+  bool has_lidar_;
+  pcl::PointCloud<pcl::PointXYZ> last_lidar_cloud_;
 
   // depth image projected point cloud
 
@@ -227,6 +237,7 @@ private:
   void projectDepthImage();
   void raycastProcess();
   void clearAndInflateLocalMap();
+  void integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, double hit_scale, double miss_scale);
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
