@@ -138,6 +138,11 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
 
   md_.count_hit_and_miss_ = vector<short>(buffer_size, 0);
   md_.count_hit_ = vector<short>(buffer_size, 0);
+  md_.depth_count_hit_and_miss_ = vector<short>(buffer_size, 0);
+  md_.depth_count_hit_ = vector<short>(buffer_size, 0);
+  md_.lidar_count_hit_and_miss_ = vector<short>(buffer_size, 0);
+  md_.lidar_count_hit_ = vector<short>(buffer_size, 0);
+  md_.flag_fusion_ = vector<char>(buffer_size, 0);
   md_.flag_rayend_ = vector<char>(buffer_size, -1);
   md_.flag_traverse_ = vector<char>(buffer_size, -1);
 
@@ -277,6 +282,57 @@ int GridMap::setCacheOccupancy(Eigen::Vector3d pos, int occ)
 
   if (occ == 1)
     md_.count_hit_[idx_ctns] += 1;
+
+  return idx_ctns;
+}
+
+void GridMap::enqueueFusionVoxel(const Eigen::Vector3i &id)
+{
+  int idx_ctns = toAddress(id);
+  if (idx_ctns < 0)
+    return;
+
+  if (md_.flag_fusion_[idx_ctns] == 0)
+  {
+    md_.flag_fusion_[idx_ctns] = 1;
+    md_.cache_voxel_.push(id);
+  }
+}
+
+int GridMap::setCacheOccupancyDepth(Eigen::Vector3d pos, int occ)
+{
+  if (occ != 1 && occ != 0)
+    return INVALID_IDX;
+
+  Eigen::Vector3i id;
+  posToIndex(pos, id);
+  int idx_ctns = toAddress(id);
+
+  md_.depth_count_hit_and_miss_[idx_ctns] += 1;
+
+  if (occ == 1)
+    md_.depth_count_hit_[idx_ctns] += 1;
+
+  enqueueFusionVoxel(id);
+
+  return idx_ctns;
+}
+
+int GridMap::setCacheOccupancyLidar(Eigen::Vector3d pos, int occ)
+{
+  if (occ != 1 && occ != 0)
+    return INVALID_IDX;
+
+  Eigen::Vector3i id;
+  posToIndex(pos, id);
+  int idx_ctns = toAddress(id);
+
+  md_.lidar_count_hit_and_miss_[idx_ctns] += 1;
+
+  if (occ == 1)
+    md_.lidar_count_hit_[idx_ctns] += 1;
+
+  enqueueFusionVoxel(id);
 
   return idx_ctns;
 }
@@ -446,7 +502,7 @@ void GridMap::raycastProcess()
       {
         pt_w = (pt_w - md_.camera_pos_) / length * mp_.max_ray_length_ + md_.camera_pos_;
       }
-      vox_idx = setCacheOccupancy(pt_w, 0);
+      vox_idx = setCacheOccupancyDepth(pt_w, 0);
     }
     else
     {
@@ -455,11 +511,11 @@ void GridMap::raycastProcess()
       if (length > mp_.max_ray_length_)
       {
         pt_w = (pt_w - md_.camera_pos_) / length * mp_.max_ray_length_ + md_.camera_pos_;
-        vox_idx = setCacheOccupancy(pt_w, 0);
+        vox_idx = setCacheOccupancyDepth(pt_w, 0);
       }
       else
       {
-        vox_idx = setCacheOccupancy(pt_w, 1);
+        vox_idx = setCacheOccupancyDepth(pt_w, 1);
       }
     }
 
@@ -494,7 +550,7 @@ void GridMap::raycastProcess()
 
       // if (length < mp_.min_ray_length_) break;
 
-      vox_idx = setCacheOccupancy(tmp, 0);
+      vox_idx = setCacheOccupancyDepth(tmp, 0);
 
       if (vox_idx != INVALID_IDX)
       {
@@ -526,7 +582,13 @@ void GridMap::raycastProcess()
 
   md_.local_updated_ = true;
 
-  // update occupancy cached in queue
+}
+
+void GridMap::fuseAndUpdateOccupancy()
+{
+  if (md_.cache_voxel_.empty())
+    return;
+
   Eigen::Vector3d local_range_min = md_.camera_pos_ - mp_.local_update_range_;
   Eigen::Vector3d local_range_max = md_.camera_pos_ + mp_.local_update_range_;
 
@@ -536,21 +598,43 @@ void GridMap::raycastProcess()
   boundIndex(min_id);
   boundIndex(max_id);
 
-  // std::cout << "cache all: " << md_.cache_voxel_.size() << std::endl;
-
   while (!md_.cache_voxel_.empty())
   {
-
     Eigen::Vector3i idx = md_.cache_voxel_.front();
     int idx_ctns = toAddress(idx);
     md_.cache_voxel_.pop();
 
-    double log_odds_update =
-      md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns]
-        ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
-        : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
+    int depth_total = md_.depth_count_hit_and_miss_[idx_ctns];
+    int lidar_total = md_.lidar_count_hit_and_miss_[idx_ctns];
+    int depth_hits = md_.depth_count_hit_[idx_ctns];
+    int lidar_hits = md_.lidar_count_hit_[idx_ctns];
+    int depth_miss = depth_total - depth_hits;
+    int lidar_miss = lidar_total - lidar_hits;
 
-    md_.count_hit_[idx_ctns] = md_.count_hit_and_miss_[idx_ctns] = 0;
+    double depth_update = 0.0;
+    double lidar_update = 0.0;
+
+    if (depth_total > 0)
+    {
+      depth_update = depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
+                                              : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
+    }
+
+    if (lidar_total > 0)
+    {
+      lidar_update = lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_
+                                              : mp_.prob_miss_log_ * mp_.lidar_miss_scale_;
+    }
+
+    md_.depth_count_hit_[idx_ctns] = 0;
+    md_.depth_count_hit_and_miss_[idx_ctns] = 0;
+    md_.lidar_count_hit_[idx_ctns] = 0;
+    md_.lidar_count_hit_and_miss_[idx_ctns] = 0;
+    md_.flag_fusion_[idx_ctns] = 0;
+
+    double log_odds_update = depth_update + lidar_update;
+    if (log_odds_update == 0.0)
+      continue;
 
     if (log_odds_update >= 0 && md_.occupancy_buffer_[idx_ctns] >= mp_.clamp_max_log_)
     {
@@ -769,11 +853,13 @@ void GridMap::updateOccupancyCallback()
       double dt = fabs((md_.last_depth_time_ - md_.last_lidar_time_).seconds());
       if (dt <= mp_.lidar_sync_tolerance_)
       {
-        integrateLidarCloud(md_.last_lidar_cloud_, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+        integrateLidarCloud(md_.last_lidar_cloud_);
       }
     }
     md_.has_lidar_ = false;
   }
+
+  fuseAndUpdateOccupancy();
 
   if (md_.local_updated_)
     clearAndInflateLocalMap();
@@ -955,7 +1041,7 @@ void GridMap::cloudCallback(const sensor_msgs::msg::PointCloud2::ConstPtr &img)
   }
 }
 
-void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, double hit_scale, double miss_scale)
+void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud)
 {
   if (!md_.has_odom_)
   {
@@ -1007,18 +1093,18 @@ void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, d
       {
         pt_w = (pt_w - sensor_pos) / dist * mp_.lidar_max_range_ + sensor_pos;
       }
-      vox_idx = setCacheOccupancy(pt_w, 0);
+      vox_idx = setCacheOccupancyLidar(pt_w, 0);
     }
     else
     {
       if (dist > mp_.lidar_max_range_)
       {
         pt_w = (pt_w - sensor_pos) / dist * mp_.lidar_max_range_ + sensor_pos;
-        vox_idx = setCacheOccupancy(pt_w, 0);
+        vox_idx = setCacheOccupancyLidar(pt_w, 0);
       }
       else
       {
-        vox_idx = setCacheOccupancy(pt_w, 1);
+        vox_idx = setCacheOccupancyLidar(pt_w, 1);
       }
     }
 
@@ -1052,7 +1138,7 @@ void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, d
       if (length < mp_.lidar_min_range_)
         continue;
 
-      vox_idx = setCacheOccupancy(tmp, 0);
+      vox_idx = setCacheOccupancyLidar(tmp, 0);
 
       if (vox_idx != INVALID_IDX)
       {
@@ -1083,50 +1169,6 @@ void GridMap::integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, d
   boundIndex(md_.local_bound_max_);
 
   md_.local_updated_ = true;
-
-  Eigen::Vector3d local_range_min = sensor_pos - mp_.local_update_range_;
-  Eigen::Vector3d local_range_max = sensor_pos + mp_.local_update_range_;
-
-  Eigen::Vector3i min_id, max_id;
-  posToIndex(local_range_min, min_id);
-  posToIndex(local_range_max, max_id);
-  boundIndex(min_id);
-  boundIndex(max_id);
-
-  while (!md_.cache_voxel_.empty())
-  {
-    Eigen::Vector3i idx = md_.cache_voxel_.front();
-    int idx_ctns = toAddress(idx);
-    md_.cache_voxel_.pop();
-
-    double log_odds_update =
-        md_.count_hit_[idx_ctns] >= md_.count_hit_and_miss_[idx_ctns] - md_.count_hit_[idx_ctns]
-            ? mp_.prob_hit_log_ * hit_scale
-            : mp_.prob_miss_log_ * miss_scale;
-
-    md_.count_hit_[idx_ctns] = md_.count_hit_and_miss_[idx_ctns] = 0;
-
-    if (log_odds_update >= 0 && md_.occupancy_buffer_[idx_ctns] >= mp_.clamp_max_log_)
-    {
-      continue;
-    }
-    else if (log_odds_update <= 0 && md_.occupancy_buffer_[idx_ctns] <= mp_.clamp_min_log_)
-    {
-      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
-      continue;
-    }
-
-    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) &&
-                    idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
-    if (!in_local)
-    {
-      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
-    }
-
-    md_.occupancy_buffer_[idx_ctns] =
-        std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
-                 mp_.clamp_max_log_);
-  }
 }
 
 void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -1157,7 +1199,9 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
 
     if (depth_stale)
     {
-      integrateLidarCloud(cloud_input, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+      integrateLidarCloud(cloud_input);
+
+      fuseAndUpdateOccupancy();
 
       if (md_.local_updated_)
         clearAndInflateLocalMap();
@@ -1172,7 +1216,9 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
     return;
   }
 
-  integrateLidarCloud(cloud_input, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+  integrateLidarCloud(cloud_input);
+
+  fuseAndUpdateOccupancy();
 
   if (md_.local_updated_)
     clearAndInflateLocalMap();

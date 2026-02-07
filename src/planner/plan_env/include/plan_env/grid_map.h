@@ -144,6 +144,9 @@ struct MappingData
   // flag buffers for speeding up raycasting
 
   vector<short> count_hit_, count_hit_and_miss_;
+  vector<short> depth_count_hit_, depth_count_hit_and_miss_;
+  vector<short> lidar_count_hit_, lidar_count_hit_and_miss_;
+  vector<char> flag_fusion_;
   vector<char> flag_traverse_, flag_rayend_;
   char raycast_num_;
   queue<Eigen::Vector3i> cache_voxel_;
@@ -238,10 +241,14 @@ private:
   void projectDepthImage();
   void raycastProcess();
   void clearAndInflateLocalMap();
-  void integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud, double hit_scale, double miss_scale);
+  void integrateLidarCloud(const pcl::PointCloud<pcl::PointXYZ> &cloud);
+  void fuseAndUpdateOccupancy();
+  void enqueueFusionVoxel(const Eigen::Vector3i &id);
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);
+  int setCacheOccupancyDepth(Eigen::Vector3d pos, int occ);
+  int setCacheOccupancyLidar(Eigen::Vector3d pos, int occ);
   Eigen::Vector3d closetPointInMap(const Eigen::Vector3d &pt, const Eigen::Vector3d &camera_pt);
 
   // typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image,
