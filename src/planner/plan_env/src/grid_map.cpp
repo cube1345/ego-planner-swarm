@@ -31,6 +31,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/lidar_max_range", 10.0);
   node_->declare_parameter("grid_map/lidar_min_range", 0.2);
   node_->declare_parameter("grid_map/lidar_sync_tolerance", 0.1);
+  node_->declare_parameter("grid_map/lidar_fallback_timeout", 0.2);
   node_->declare_parameter("grid_map/lidar_hit_scale", 1.0);
   node_->declare_parameter("grid_map/lidar_miss_scale", 1.0);
   node_->declare_parameter("grid_map/use_lidar_buffer", false);
@@ -76,6 +77,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/lidar_max_range", mp_.lidar_max_range_);
   node_->get_parameter("grid_map/lidar_min_range", mp_.lidar_min_range_);
   node_->get_parameter("grid_map/lidar_sync_tolerance", mp_.lidar_sync_tolerance_);
+  node_->get_parameter("grid_map/lidar_fallback_timeout", mp_.lidar_fallback_timeout_);
   node_->get_parameter("grid_map/lidar_hit_scale", mp_.lidar_hit_scale_);
   node_->get_parameter("grid_map/lidar_miss_scale", mp_.lidar_miss_scale_);
   node_->get_parameter("grid_map/use_lidar_buffer", mp_.use_lidar_buffer_);
@@ -1142,6 +1144,29 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
 
   if (mp_.use_lidar_buffer_)
   {
+    bool depth_stale = false;
+    if (!md_.flag_use_depth_fusion || md_.last_depth_time_.nanoseconds() == 0)
+    {
+      depth_stale = true;
+    }
+    else
+    {
+      double dt = fabs((node_->now() - md_.last_depth_time_).seconds());
+      depth_stale = dt > mp_.lidar_fallback_timeout_;
+    }
+
+    if (depth_stale)
+    {
+      integrateLidarCloud(cloud_input, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+
+      if (md_.local_updated_)
+        clearAndInflateLocalMap();
+
+      md_.local_updated_ = false;
+      md_.last_occ_update_time_ = node_->now();
+      return;
+    }
+
     md_.last_lidar_cloud_ = cloud_input;
     md_.has_lidar_ = true;
     return;

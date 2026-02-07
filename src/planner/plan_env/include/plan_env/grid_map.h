@@ -77,6 +77,7 @@ struct MappingParameters
   double lidar_max_range_;
   double lidar_min_range_;
   double lidar_sync_tolerance_;
+  double lidar_fallback_timeout_;
   double lidar_hit_scale_;
   double lidar_miss_scale_;
   bool use_lidar_buffer_;

@@ -177,6 +177,7 @@ def generate_launch_description():
             {'grid_map/lidar_max_range': 10.0},
             {'grid_map/use_lidar_buffer': True},
             {'grid_map/lidar_sync_tolerance': 0.1},
+            {'grid_map/lidar_fallback_timeout': 0.2},
             {'grid_map/depth_hit_scale': 1.0},
             {'grid_map/depth_miss_scale': 1.0},
             {'grid_map/lidar_hit_scale': 1.2},
