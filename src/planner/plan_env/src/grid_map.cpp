@@ -39,6 +39,11 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/p_miss", 0.35);
   node_->declare_parameter("grid_map/depth_hit_scale", 1.0);
   node_->declare_parameter("grid_map/depth_miss_scale", 1.0);
+  node_->declare_parameter("grid_map/fusion_conflict_scale", 0.3);
+  node_->declare_parameter("grid_map/depth_decay_distance", 5.0);
+  node_->declare_parameter("grid_map/depth_min_scale", 0.4);
+  node_->declare_parameter("grid_map/lidar_decay_distance", 12.0);
+  node_->declare_parameter("grid_map/lidar_min_scale", 0.4);
   node_->declare_parameter("grid_map/p_min", 0.12);
   node_->declare_parameter("grid_map/p_max", 0.97);
   node_->declare_parameter("grid_map/p_occ", 0.80);
@@ -85,6 +90,11 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/p_miss", mp_.p_miss_);
   node_->get_parameter("grid_map/depth_hit_scale", mp_.depth_hit_scale_);
   node_->get_parameter("grid_map/depth_miss_scale", mp_.depth_miss_scale_);
+  node_->get_parameter("grid_map/fusion_conflict_scale", mp_.fusion_conflict_scale_);
+  node_->get_parameter("grid_map/depth_decay_distance", mp_.depth_decay_distance_);
+  node_->get_parameter("grid_map/depth_min_scale", mp_.depth_min_scale_);
+  node_->get_parameter("grid_map/lidar_decay_distance", mp_.lidar_decay_distance_);
+  node_->get_parameter("grid_map/lidar_min_scale", mp_.lidar_min_scale_);
   node_->get_parameter("grid_map/p_min", mp_.p_min_);
   node_->get_parameter("grid_map/p_max", mp_.p_max_);
   node_->get_parameter("grid_map/p_occ", mp_.p_occ_);
@@ -142,6 +152,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.depth_count_hit_ = vector<short>(buffer_size, 0);
   md_.lidar_count_hit_and_miss_ = vector<short>(buffer_size, 0);
   md_.lidar_count_hit_ = vector<short>(buffer_size, 0);
+  md_.depth_dist_sum_ = vector<float>(buffer_size, 0.0f);
+  md_.lidar_dist_sum_ = vector<float>(buffer_size, 0.0f);
   md_.flag_fusion_ = vector<char>(buffer_size, 0);
   md_.flag_rayend_ = vector<char>(buffer_size, -1);
   md_.flag_traverse_ = vector<char>(buffer_size, -1);
@@ -308,6 +320,9 @@ int GridMap::setCacheOccupancyDepth(Eigen::Vector3d pos, int occ)
   posToIndex(pos, id);
   int idx_ctns = toAddress(id);
 
+  double dist = (pos - md_.camera_pos_).norm();
+  md_.depth_dist_sum_[idx_ctns] += static_cast<float>(dist);
+
   md_.depth_count_hit_and_miss_[idx_ctns] += 1;
 
   if (occ == 1)
@@ -326,6 +341,9 @@ int GridMap::setCacheOccupancyLidar(Eigen::Vector3d pos, int occ)
   Eigen::Vector3i id;
   posToIndex(pos, id);
   int idx_ctns = toAddress(id);
+
+  double dist = (pos - md_.camera_pos_).norm();
+  md_.lidar_dist_sum_[idx_ctns] += static_cast<float>(dist);
 
   md_.lidar_count_hit_and_miss_[idx_ctns] += 1;
 
@@ -613,15 +631,23 @@ void GridMap::fuseAndUpdateOccupancy()
 
     double depth_update = 0.0;
     double lidar_update = 0.0;
+    double depth_scale = 1.0;
+    double lidar_scale = 1.0;
 
     if (depth_total > 0)
     {
+      double avg_depth_dist = md_.depth_dist_sum_[idx_ctns] / std::max(1, depth_total);
+      double depth_decay = exp(-avg_depth_dist / std::max(1e-3, mp_.depth_decay_distance_));
+      depth_scale = std::max(mp_.depth_min_scale_, depth_decay) * mp_.depth_hit_scale_;
       depth_update = depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
                                               : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
     }
 
     if (lidar_total > 0)
     {
+      double avg_lidar_dist = md_.lidar_dist_sum_[idx_ctns] / std::max(1, lidar_total);
+      double lidar_decay = exp(-avg_lidar_dist / std::max(1e-3, mp_.lidar_decay_distance_));
+      lidar_scale = std::max(mp_.lidar_min_scale_, lidar_decay) * mp_.lidar_hit_scale_;
       lidar_update = lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_
                                               : mp_.prob_miss_log_ * mp_.lidar_miss_scale_;
     }
@@ -630,9 +656,17 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.depth_count_hit_and_miss_[idx_ctns] = 0;
     md_.lidar_count_hit_[idx_ctns] = 0;
     md_.lidar_count_hit_and_miss_[idx_ctns] = 0;
+    md_.depth_dist_sum_[idx_ctns] = 0.0f;
+    md_.lidar_dist_sum_[idx_ctns] = 0.0f;
     md_.flag_fusion_[idx_ctns] = 0;
 
+    depth_update *= depth_scale;
+    lidar_update *= lidar_scale;
     double log_odds_update = depth_update + lidar_update;
+    if (depth_update * lidar_update < 0.0)
+    {
+      log_odds_update *= mp_.fusion_conflict_scale_;
+    }
     if (log_odds_update == 0.0)
       continue;
 
