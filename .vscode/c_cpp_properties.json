@@ -5,7 +5,10 @@
           "includePath": [
               "${workspaceFolder}/**",
               "/opt/ros/humble/include/**",
-              
+              "/usr/include/eigen3",
+              "/usr/include",
+              "/usr/include/pcl-1.12",
+              "/usr/include/opencv4"
           ],
           "defines": [],
           "compilerPath": "/usr/bin/gcc",
