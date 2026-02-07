@@ -183,6 +183,8 @@ def generate_launch_description():
             {'grid_map/fusion_conflict_scale': 0.6},
             {'grid_map/lidar_hit_scale': 1.2},
             {'grid_map/lidar_miss_scale': 1.0},
+            {'grid_map/lidar_decay_distance': 12.0},
+            {'grid_map/lidar_min_scale': 0.4},
             
             {'grid_map/virtual_ceil_height': 2.9},
             {'grid_map/visualization_truncate_height': 1.8},

@@ -147,6 +147,8 @@ struct MappingData
   vector<short> count_hit_, count_hit_and_miss_;
   vector<short> depth_count_hit_, depth_count_hit_and_miss_;
   vector<short> lidar_count_hit_, lidar_count_hit_and_miss_;
+  vector<float> depth_dist_sum_;
+  vector<float> lidar_dist_sum_;
   vector<char> flag_fusion_;
   vector<char> flag_traverse_, flag_rayend_;
   char raycast_num_;

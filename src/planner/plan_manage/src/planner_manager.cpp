@@ -1,6 +1,7 @@
 // #include <fstream>
 #include <ego_planner/planner_manager.h>
 #include <thread>
+#include <algorithm>
 #include "visualization_msgs/msg/marker.hpp" // zx-todo
 
 namespace ego_planner
@@ -40,7 +41,10 @@ namespace ego_planner
     bspline_optimizer_->setParam(node);
     bspline_optimizer_->setEnvironment(grid_map_, obj_predictor_);
     bspline_optimizer_->a_star_.reset(new AStar);
-    bspline_optimizer_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(100, 100, 100));
+    const double astar_step = 0.1;
+    int pool_size = static_cast<int>(ceil(pp_.planning_horizen_ / astar_step)) * 2 + 10;
+    pool_size = std::max(50, std::min(pool_size, 300));
+    bspline_optimizer_->a_star_->initGridMap(grid_map_, Eigen::Vector3i(pool_size, pool_size, pool_size));
 
     visualization_ = vis;
   }

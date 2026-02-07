@@ -144,6 +144,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.depth_count_hit_ = vector<short>(buffer_size, 0);
   md_.lidar_count_hit_and_miss_ = vector<short>(buffer_size, 0);
   md_.lidar_count_hit_ = vector<short>(buffer_size, 0);
+  md_.depth_dist_sum_ = vector<float>(buffer_size, 0.0f);
+  md_.lidar_dist_sum_ = vector<float>(buffer_size, 0.0f);
   md_.flag_fusion_ = vector<char>(buffer_size, 0);
   md_.flag_rayend_ = vector<char>(buffer_size, -1);
   md_.flag_traverse_ = vector<char>(buffer_size, -1);
@@ -310,6 +312,9 @@ int GridMap::setCacheOccupancyDepth(Eigen::Vector3d pos, int occ)
   posToIndex(pos, id);
   int idx_ctns = toAddress(id);
 
+  double dist = (pos - md_.camera_pos_).norm();
+  md_.depth_dist_sum_[idx_ctns] += static_cast<float>(dist);
+
   md_.depth_count_hit_and_miss_[idx_ctns] += 1;
 
   if (occ == 1)
@@ -328,6 +333,9 @@ int GridMap::setCacheOccupancyLidar(Eigen::Vector3d pos, int occ)
   Eigen::Vector3i id;
   posToIndex(pos, id);
   int idx_ctns = toAddress(id);
+
+  double dist = (pos - md_.camera_pos_).norm();
+  md_.lidar_dist_sum_[idx_ctns] += static_cast<float>(dist);
 
   md_.lidar_count_hit_and_miss_[idx_ctns] += 1;
 
@@ -615,15 +623,23 @@ void GridMap::fuseAndUpdateOccupancy()
 
     double depth_update = 0.0;
     double lidar_update = 0.0;
+    double depth_scale = 1.0;
+    double lidar_scale = 1.0;
 
     if (depth_total > 0)
     {
+      double avg_depth_dist = md_.depth_dist_sum_[idx_ctns] / std::max(1, depth_total);
+      double depth_decay = exp(-avg_depth_dist / std::max(1e-3, mp_.depth_decay_distance_));
+      depth_scale = std::max(mp_.depth_min_scale_, depth_decay) * mp_.depth_hit_scale_;
       depth_update = depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
                                               : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
     }
 
     if (lidar_total > 0)
     {
+      double avg_lidar_dist = md_.lidar_dist_sum_[idx_ctns] / std::max(1, lidar_total);
+      double lidar_decay = exp(-avg_lidar_dist / std::max(1e-3, mp_.lidar_decay_distance_));
+      lidar_scale = std::max(mp_.lidar_min_scale_, lidar_decay) * mp_.lidar_hit_scale_;
       lidar_update = lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_
                                               : mp_.prob_miss_log_ * mp_.lidar_miss_scale_;
     }
@@ -632,8 +648,12 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.depth_count_hit_and_miss_[idx_ctns] = 0;
     md_.lidar_count_hit_[idx_ctns] = 0;
     md_.lidar_count_hit_and_miss_[idx_ctns] = 0;
+    md_.depth_dist_sum_[idx_ctns] = 0.0f;
+    md_.lidar_dist_sum_[idx_ctns] = 0.0f;
     md_.flag_fusion_[idx_ctns] = 0;
 
+    depth_update *= depth_scale;
+    lidar_update *= lidar_scale;
     double log_odds_update = depth_update + lidar_update;
     if (depth_update * lidar_update < 0.0)
     {
