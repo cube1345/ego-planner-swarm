@@ -89,6 +89,7 @@ struct MappingParameters
   double min_ray_length_, max_ray_length_; // range of doing raycasting
   double depth_hit_scale_;
   double depth_miss_scale_;
+  double fusion_conflict_scale_;
 
   /* local map update and clear */
   int local_map_margin_;

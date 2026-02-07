@@ -39,6 +39,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/p_miss", 0.35);
   node_->declare_parameter("grid_map/depth_hit_scale", 1.0);
   node_->declare_parameter("grid_map/depth_miss_scale", 1.0);
+  node_->declare_parameter("grid_map/fusion_conflict_scale", 0.3);
   node_->declare_parameter("grid_map/p_min", 0.12);
   node_->declare_parameter("grid_map/p_max", 0.97);
   node_->declare_parameter("grid_map/p_occ", 0.80);
@@ -85,6 +86,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/p_miss", mp_.p_miss_);
   node_->get_parameter("grid_map/depth_hit_scale", mp_.depth_hit_scale_);
   node_->get_parameter("grid_map/depth_miss_scale", mp_.depth_miss_scale_);
+  node_->get_parameter("grid_map/fusion_conflict_scale", mp_.fusion_conflict_scale_);
   node_->get_parameter("grid_map/p_min", mp_.p_min_);
   node_->get_parameter("grid_map/p_max", mp_.p_max_);
   node_->get_parameter("grid_map/p_occ", mp_.p_occ_);
@@ -633,6 +635,10 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.flag_fusion_[idx_ctns] = 0;
 
     double log_odds_update = depth_update + lidar_update;
+    if (depth_update * lidar_update < 0.0)
+    {
+      log_odds_update *= mp_.fusion_conflict_scale_;
+    }
     if (log_odds_update == 0.0)
       continue;
 
