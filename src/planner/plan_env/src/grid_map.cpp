@@ -670,42 +670,40 @@ void GridMap::fuseAndUpdateOccupancy()
   boundIndex(min_id);
   boundIndex(max_id);
 
-  while (!md_.cache_voxel_.empty())
-  {
+  auto safe_div = [](double a, int b) { return b > 0 ? a / b : 0.0; };
+  auto decay = [](double dist, double decay_dist) { return exp(-dist / std::max(1e-3, decay_dist)); };
+  auto clip = [](double val, double minv, double maxv) { return std::min(std::max(val, minv), maxv); };
+  auto fusion_update = [&](int idx_ctns, int depth_total, int lidar_total, int depth_hits, int lidar_hits) {
+    double depth_update = 0.0, lidar_update = 0.0;
+    double depth_scale = 1.0, lidar_scale = 1.0;
+    if (depth_total > 0) {
+      double avg_depth_dist = safe_div(md_.depth_dist_sum_[idx_ctns], depth_total);
+      double depth_decay = decay(avg_depth_dist, mp_.depth_decay_distance_);
+      depth_scale = std::max(mp_.depth_min_scale_, depth_decay) * mp_.depth_hit_scale_;
+      int depth_miss = depth_total - depth_hits;
+      depth_update = (depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_ : mp_.prob_miss_log_ * mp_.depth_miss_scale_) * depth_scale;
+    }
+    if (lidar_total > 0) {
+      double avg_lidar_dist = safe_div(md_.lidar_dist_sum_[idx_ctns], lidar_total);
+      double lidar_decay = decay(avg_lidar_dist, mp_.lidar_decay_distance_);
+      lidar_scale = std::max(mp_.lidar_min_scale_, lidar_decay) * mp_.lidar_hit_scale_;
+      int lidar_miss = lidar_total - lidar_hits;
+      lidar_update = (lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_ : mp_.prob_miss_log_ * mp_.lidar_miss_scale_) * lidar_scale;
+    }
+    return std::make_pair(depth_update, lidar_update);
+  };
+
+  while (!md_.cache_voxel_.empty()) {
     Eigen::Vector3i idx = md_.cache_voxel_.front();
     int idx_ctns = toAddress(idx);
     md_.cache_voxel_.pop();
-
     int depth_total = md_.depth_count_hit_and_miss_[idx_ctns];
     int lidar_total = md_.lidar_count_hit_and_miss_[idx_ctns];
     int depth_hits = md_.depth_count_hit_[idx_ctns];
     int lidar_hits = md_.lidar_count_hit_[idx_ctns];
-    int depth_miss = depth_total - depth_hits;
-    int lidar_miss = lidar_total - lidar_hits;
+    auto [depth_update, lidar_update] = fusion_update(idx_ctns, depth_total, lidar_total, depth_hits, lidar_hits);
 
-    double depth_update = 0.0;
-    double lidar_update = 0.0;
-    double depth_scale = 1.0;
-    double lidar_scale = 1.0;
-
-    if (depth_total > 0)
-    {
-      double avg_depth_dist = md_.depth_dist_sum_[idx_ctns] / std::max(1, depth_total);
-      double depth_decay = exp(-avg_depth_dist / std::max(1e-3, mp_.depth_decay_distance_));
-      depth_scale = std::max(mp_.depth_min_scale_, depth_decay) * mp_.depth_hit_scale_;
-      depth_update = depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
-                                              : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
-    }
-
-    if (lidar_total > 0)
-    {
-      double avg_lidar_dist = md_.lidar_dist_sum_[idx_ctns] / std::max(1, lidar_total);
-      double lidar_decay = exp(-avg_lidar_dist / std::max(1e-3, mp_.lidar_decay_distance_));
-      lidar_scale = std::max(mp_.lidar_min_scale_, lidar_decay) * mp_.lidar_hit_scale_;
-      lidar_update = lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_
-                                              : mp_.prob_miss_log_ * mp_.lidar_miss_scale_;
-    }
-
+    // 清理缓存
     md_.depth_count_hit_[idx_ctns] = 0;
     md_.depth_count_hit_and_miss_[idx_ctns] = 0;
     md_.lidar_count_hit_[idx_ctns] = 0;
@@ -714,39 +712,27 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.lidar_dist_sum_[idx_ctns] = 0.0f;
     md_.flag_fusion_[idx_ctns] = 0;
 
-    depth_update *= depth_scale;
-    lidar_update *= lidar_scale;
     double log_odds_update = depth_update + lidar_update;
-    if (depth_update * lidar_update < 0.0)
-    {
+    // 冲突判定与统计
+    if (depth_update * lidar_update < 0.0) {
       log_odds_update *= mp_.fusion_conflict_scale_;
       md_.conflict_voxel_count_ += 1;
       if (mp_.publish_conflict_cloud_)
         md_.conflict_voxels_.push_back(idx);
     }
-    if (log_odds_update == 0.0)
-      continue;
+    if (log_odds_update == 0.0) continue;
 
-    if (log_odds_update >= 0 && md_.occupancy_buffer_[idx_ctns] >= mp_.clamp_max_log_)
-    {
-      continue;
-    }
-    else if (log_odds_update <= 0 && md_.occupancy_buffer_[idx_ctns] <= mp_.clamp_min_log_)
-    {
-      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
+    double &occ = md_.occupancy_buffer_[idx_ctns];
+    if (log_odds_update >= 0 && occ >= mp_.clamp_max_log_) continue;
+    if (log_odds_update <= 0 && occ <= mp_.clamp_min_log_) {
+      occ = mp_.clamp_min_log_;
       continue;
     }
 
-    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) &&
-                    idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
-    if (!in_local)
-    {
-      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
-    }
+    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) && idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
+    if (!in_local) occ = mp_.clamp_min_log_;
 
-    md_.occupancy_buffer_[idx_ctns] =
-        std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
-                 mp_.clamp_max_log_);
+    occ = clip(occ + log_odds_update, mp_.clamp_min_log_, mp_.clamp_max_log_);
     md_.fused_voxel_count_ += 1;
   }
 

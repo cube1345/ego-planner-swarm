@@ -12,13 +12,14 @@ if [[ "$DURATION_SEC" -lt 30 ]]; then
 fi
 WORKDIR="/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm"
 LAUNCH_CMD="ros2 launch ego_planner single_run_in_sim.launch.py"
-
-DEPTH_LOG="/tmp/run_depth_only.log"
-FUSION_LOG="/tmp/run_fusion.log"
-DEPTH_CSV="/tmp/grid_map_fusion_stats_depth.csv"
-FUSION_CSV="/tmp/grid_map_fusion_stats_fusion.csv"
-STATS_CSV="/tmp/grid_map_fusion_stats.csv"
-SUMMARY_OUT="/tmp/compare_fusion_summary.txt"
+OUTPUT_DIR="$WORKDIR/output"
+mkdir -p "$OUTPUT_DIR"
+DEPTH_LOG="$OUTPUT_DIR/run_depth_only.log"
+FUSION_LOG="$OUTPUT_DIR/run_fusion.log"
+DEPTH_CSV="$OUTPUT_DIR/grid_map_fusion_stats_depth.csv"
+FUSION_CSV="$OUTPUT_DIR/grid_map_fusion_stats_fusion.csv"
+STATS_CSV="$OUTPUT_DIR/grid_map_fusion_stats.csv"
+SUMMARY_OUT="$OUTPUT_DIR/compare_fusion_summary.txt"
 
 set +u
 if [[ -f "/opt/ros/humble/setup.bash" ]]; then

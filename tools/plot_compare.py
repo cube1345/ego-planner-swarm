@@ -102,10 +102,13 @@ def plot_metrics(metrics: Dict[str, float], out_prefix: str, depth_csv: str, fus
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Plot fusion comparison metrics.")
-    parser.add_argument("--summary", default="/tmp/compare_fusion_summary.txt", help="summary text file")
-    parser.add_argument("--depth-csv", default="/tmp/grid_map_fusion_stats_depth.csv", help="depth stats CSV")
-    parser.add_argument("--fusion-csv", default="/tmp/grid_map_fusion_stats_fusion.csv", help="fusion stats CSV")
-    parser.add_argument("--out", default="/tmp/fusion_compare", help="output file prefix")
+    workspace_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = os.path.join(workspace_dir, "../output")
+    os.makedirs(output_dir, exist_ok=True)
+    parser.add_argument("--summary", default=os.path.join(output_dir, "compare_fusion_summary.txt"), help="summary text file")
+    parser.add_argument("--depth-csv", default=os.path.join(output_dir, "grid_map_fusion_stats_depth.csv"), help="depth stats CSV")
+    parser.add_argument("--fusion-csv", default=os.path.join(output_dir, "grid_map_fusion_stats_fusion.csv"), help="fusion stats CSV")
+    parser.add_argument("--out", default=os.path.join(output_dir, "fusion_compare"), help="output file prefix")
     args = parser.parse_args()
 
     if not os.path.exists(args.summary):
