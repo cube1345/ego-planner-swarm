@@ -18,6 +18,8 @@ private:
     int binning;
     bool isBinningSet;
     bool updated;
+    int block_size = 4000; // 支持自适应调整
+    std::unordered_map<int, std::vector<signed char>> block_data;
 
 public:
     Map2D()
@@ -67,8 +69,16 @@ public:
         int ym = (y - map.info.origin.position.y) / map.info.resolution;
         if (xm < 0 || xm > (int)(map.info.width - 1) || ym < 0 || ym > (int)(map.info.height - 1))
             return 0;
-        else
-            return map.data[ym * map.info.width + xm];
+        else {
+            int idx = ym * map.info.width + xm;
+            int block_idx = idx / block_size;
+            int offset = idx % block_size;
+            auto it = block_data.find(block_idx);
+            if (it != block_data.end() && offset < it->second.size())
+                return it->second[offset];
+            else
+                return 0;
+        }
     }
 
     void Replace(nav_msgs::msg::OccupancyGrid m)
@@ -105,11 +115,32 @@ public:
         }
         // Replace map
         map = m;
+        block_data.clear();
+        for (size_t i = 0; i < m.data.size(); i++) {
+            int block_idx = i / block_size;
+            int offset = i % block_size;
+            if (block_data.find(block_idx) == block_data.end())
+                block_data[block_idx] = std::vector<signed char>(block_size, 0);
+            block_data[block_idx][offset] = m.data[i];
+        }
         updated = true;
     }
 
     // Merge submap
     void Update(nav_msgs::msg::OccupancyGrid m)
+            // 动态调整分块大小：每次扩展后统计稀疏性，自动调整 block_size
+            if (map.info.width * map.info.height > 100000) { // 大地图自动增大块
+                int nonzero = 0, total = 0;
+                for (const auto& kv : block_data) {
+                    for (auto v : kv.second) {
+                        if (v != 0) nonzero++;
+                        total++;
+                    }
+                }
+                double ratio = total > 0 ? (double)nonzero / total : 0.0;
+                if (ratio < 0.05 && block_size < 20000) block_size *= 2; // 稀疏则增大块
+                if (ratio > 0.2 && block_size > 2000) block_size /= 2;   // 密集则减小块
+            }
     {
         // Check data
         if (m.data.size() == 0)

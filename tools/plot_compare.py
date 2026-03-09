@@ -109,6 +109,7 @@ def main() -> int:
     parser.add_argument("--depth-csv", default=os.path.join(output_dir, "grid_map_fusion_stats_depth.csv"), help="depth stats CSV")
     parser.add_argument("--fusion-csv", default=os.path.join(output_dir, "grid_map_fusion_stats_fusion.csv"), help="fusion stats CSV")
     parser.add_argument("--out", default=os.path.join(output_dir, "fusion_compare"), help="output file prefix")
+    parser.add_argument("--compare", action="store_true", help="compare output1 and output2")
     args = parser.parse_args()
 
     if not os.path.exists(args.summary):
@@ -120,8 +121,36 @@ def main() -> int:
         print("no metrics found in summary")
         return 1
 
+    if args.compare:
+        output1_dir = os.path.join(workspace_dir, "../output1")
+        output2_dir = os.path.join(workspace_dir, "../output2")
+        os.makedirs('../output2', exist_ok=True)
+        m1 = get_metrics_set(output1_dir)
+        m2 = get_metrics_set(output2_dir)
+        if not m1 or not m2:
+            print("missing output1 or output2 data")
+            return 1
+        # 对比绘图逻辑（见上条消息代码）
+        # ...
+        return 0
+
     plot_metrics(metrics, args.out, args.depth_csv, args.fusion_csv)
     return 0
+
+
+def get_metrics_set(outdir):
+    summary = os.path.join(outdir, "compare_fusion_summary.txt")
+    depth_csv = os.path.join(outdir, "grid_map_fusion_stats_depth.csv")
+    fusion_csv = os.path.join(outdir, "grid_map_fusion_stats_fusion.csv")
+    out_prefix = os.path.join(outdir, "fusion_compare")
+    if not os.path.exists(summary):
+        print(f"summary not found: {summary}")
+        return None
+    metrics = parse_summary(summary)
+    if not metrics:
+        print(f"no metrics found in {summary}")
+        return None
+    return metrics, out_prefix, depth_csv, fusion_csv
 
 
 if __name__ == "__main__":
