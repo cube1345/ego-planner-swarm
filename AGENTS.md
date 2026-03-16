@@ -9,6 +9,11 @@ This repository is a ROS 2 (`ament_cmake`) workspace. Core code lives under `src
 
 Build artifacts are workspace-level: `build/`, `install/`, `log/`.
 
+## Project Focus
+- This project targets **algorithmic optimization of EGO-Planner on ROS 2**, with emphasis on the **perception-layer map modeling pipeline**.
+- Optimization work should prioritize **multi-modal environment sensing fusion** (for example depth + LiDAR + odometry-consistent updates).
+- Any optimization is incomplete without an objective comparison against a baseline.
+
 ## Build, Test, and Development Commands
 Run from repository root:
 - `colcon build --symlink-install`  
@@ -33,6 +38,20 @@ Run from repository root:
 - Existing tests include gtest-based coverage (for example `src/uav_simulator/Utils/uav_utils/src/uav_utils_test.cpp`).
 - Name new C++ tests as `*_test.cpp` and register with `ament_add_gtest`.
 - Add regression tests for planner/sensing changes that alter map fusion, trajectory validity, or collision behavior.
+
+## Optimization Comparison Workflow
+- For each map-modeling optimization, run **paired experiments**: `baseline` vs `optimized`.
+- Comparison dimensions may vary by change, e.g.:
+  - trajectory success/failure
+  - collision/rebound counts
+  - map conflict ratio over time
+  - planning stability/latency
+- Store logs and metric summaries under `output/` with clear run labels.
+- Use the existing **rospy virtual environment** for plotting and result visualization.
+- Preferred plotting flow:
+  - `source <rospy_venv>/bin/activate`
+  - `python tools/plot_compare.py`
+- Every optimization PR should include at least one generated figure and a short interpretation of the result.
 
 ## Commit & Pull Request Guidelines
 Recent history mixes brief updates (`Update Readme.md`) and scoped commits (`feat(grid_map): ...`). For consistency, use:
@@ -69,6 +88,7 @@ This section applies when collaborating with cube on this repository.
   - `source install/setup.bash`
   - `ros2 launch ego_planner single_run_in_sim.launch.py`
 - For mapping fusion or metrics updates, run and check `tools/compare_fusion.sh` and `tools/plot_compare.py` outputs under `output/`.
+- Plot generation must run inside the prepared `rospy` virtual environment for consistency across comparisons.
 - Multi-step tasks must be tracked to closure; if direction drifts (large unexpected diff or repeated edits), stop and reassess.
 
 ### Git and Safety
