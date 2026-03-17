@@ -78,7 +78,9 @@ struct MappingParameters
   double lidar_max_range_;
   double lidar_min_range_;
   double lidar_sync_tolerance_;
+  double lidar_sync_tolerance_relaxed_;
   double lidar_fallback_timeout_;
+  double odom_fallback_timeout_;
   double lidar_hit_scale_;
   double lidar_miss_scale_;
   bool use_lidar_buffer_;
@@ -140,6 +142,7 @@ struct MappingData
   rclcpp::Time last_occ_update_time_;
   rclcpp::Time last_depth_time_;
   rclcpp::Time last_lidar_time_;
+  rclcpp::Time last_odom_time_;
   bool flag_depth_odom_timeout_;
   bool flag_use_depth_fusion;
   bool has_lidar_;
@@ -263,6 +266,8 @@ private:
   void fuseAndUpdateOccupancy();
   void enqueueFusionVoxel(const Eigen::Vector3i &id);
   void publishConflictMap();
+  bool isTimestampFresh(const rclcpp::Time &reference, const rclcpp::Time &sample, double tolerance) const;
+  double timestampDelta(const rclcpp::Time &lhs, const rclcpp::Time &rhs) const;
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);

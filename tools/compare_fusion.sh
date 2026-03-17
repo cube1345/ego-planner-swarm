@@ -47,8 +47,10 @@ run_case() {
   sleep 5
 
   ros2 param set /drone_0_ego_planner_node grid_map/use_lidar_buffer "$use_lidar" >/dev/null
-  ros2 param set /drone_0_ego_planner_node grid_map/lidar_sync_tolerance 0.1 >/dev/null
-  ros2 param set /drone_0_ego_planner_node grid_map/lidar_fallback_timeout 0.2 >/dev/null
+  ros2 param set /drone_0_ego_planner_node grid_map/lidar_sync_tolerance 0.08 >/dev/null
+  ros2 param set /drone_0_ego_planner_node grid_map/lidar_sync_tolerance_relaxed 0.16 >/dev/null
+  ros2 param set /drone_0_ego_planner_node grid_map/lidar_fallback_timeout 0.15 >/dev/null
+  ros2 param set /drone_0_ego_planner_node grid_map/odom_fallback_timeout 0.15 >/dev/null
   ros2 param set /drone_0_ego_planner_node grid_map/lidar_hit_scale "$hit_scale" >/dev/null
   ros2 param set /drone_0_ego_planner_node grid_map/lidar_miss_scale "$miss_scale" >/dev/null
   ros2 param set /drone_0_ego_planner_node grid_map/lidar_max_range 6.0 >/dev/null

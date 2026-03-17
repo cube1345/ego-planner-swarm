@@ -1,0 +1,13 @@
+[INFO] Done. Logs and CSVs:
+-rw-rw-r-- 1 cube cube 171347 Mar 17 03:09 /home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/output/run_depth_only.log
+-rw-rw-r-- 1 cube cube 293126 Mar 17 03:09 /home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/output/run_fusion.log
+depth avg_conflict_ratio= N/A
+fusion avg_conflict_ratio= N/A
+depth success_rate=0.605 (success=69, fail=45)
+fusion success_rate=0.579 (success=84, fail=61)
+depth traj failed count=134
+fusion traj failed count=200
+depth collided count=457
+fusion collided count=653
+depth rebound count=1008
+fusion rebound count=1890

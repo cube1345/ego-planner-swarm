@@ -1,5 +1,7 @@
 #include "plan_env/grid_map.h"
 
+#include <limits>
+
 // #define current_img_ md_.depth_image_[image_cnt_ & 1]
 // #define last_img_ md_.depth_image_[!(image_cnt_ & 1)]
 
@@ -31,7 +33,9 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/lidar_max_range", 10.0);
   node_->declare_parameter("grid_map/lidar_min_range", 0.2);
   node_->declare_parameter("grid_map/lidar_sync_tolerance", 0.1);
+  node_->declare_parameter("grid_map/lidar_sync_tolerance_relaxed", 0.16);
   node_->declare_parameter("grid_map/lidar_fallback_timeout", 0.2);
+  node_->declare_parameter("grid_map/odom_fallback_timeout", 0.15);
   node_->declare_parameter("grid_map/lidar_hit_scale", 1.0);
   node_->declare_parameter("grid_map/lidar_miss_scale", 1.0);
   node_->declare_parameter("grid_map/use_lidar_buffer", false);
@@ -85,7 +89,9 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/lidar_max_range", mp_.lidar_max_range_);
   node_->get_parameter("grid_map/lidar_min_range", mp_.lidar_min_range_);
   node_->get_parameter("grid_map/lidar_sync_tolerance", mp_.lidar_sync_tolerance_);
+  node_->get_parameter("grid_map/lidar_sync_tolerance_relaxed", mp_.lidar_sync_tolerance_relaxed_);
   node_->get_parameter("grid_map/lidar_fallback_timeout", mp_.lidar_fallback_timeout_);
+  node_->get_parameter("grid_map/odom_fallback_timeout", mp_.odom_fallback_timeout_);
   node_->get_parameter("grid_map/lidar_hit_scale", mp_.lidar_hit_scale_);
   node_->get_parameter("grid_map/lidar_miss_scale", mp_.lidar_miss_scale_);
   node_->get_parameter("grid_map/use_lidar_buffer", mp_.use_lidar_buffer_);
@@ -253,6 +259,7 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   md_.last_occ_update_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
   md_.last_depth_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
   md_.last_lidar_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
+  md_.last_odom_time_ = rclcpp::Time(0, 0, RCL_SYSTEM_TIME);
   md_.has_lidar_ = false;
 
   md_.fuse_time_ = 0.0;
@@ -670,45 +677,34 @@ void GridMap::fuseAndUpdateOccupancy()
   boundIndex(min_id);
   boundIndex(max_id);
 
-  auto safe_div = [](double a, int b) { return b > 0 ? a / b : 0.0; };
-  auto decay = [](double dist, double decay_dist) { return exp(-dist / std::max(1e-3, decay_dist)); };
-  auto clip = [](double val, double minv, double maxv) { return std::min(std::max(val, minv), maxv); };
-  auto modality_update = [&](int idx_ctns, int total, int hits, double dist_sum,
-                             double decay_distance, double min_scale,
-                             double hit_scale, double miss_scale) {
-    if (total <= 0)
-      return std::make_pair(0.0, 0.0);
-
-    const int miss = total - hits;
-    const double hit_ratio = safe_div(static_cast<double>(hits), total);
-    const double confidence = std::fabs(2.0 * hit_ratio - 1.0);    // 0: ambiguous, 1: consistent
-    const double support = 1.0 - std::exp(-0.25 * total);          // higher with more samples
-    const double avg_dist = safe_div(dist_sum, total);
-    const double range_weight = std::max(min_scale, decay(avg_dist, decay_distance));
-    const bool occupied_vote = hits >= miss;
-    const double vote_log = occupied_vote ? mp_.prob_hit_log_ * hit_scale : mp_.prob_miss_log_ * miss_scale;
-
-    // reliability blends sample support and vote consistency to suppress noisy updates
-    const double reliability = (0.35 + 0.65 * confidence) * support * range_weight;
-    return std::make_pair(vote_log * reliability, reliability);
-  };
-
-  while (!md_.cache_voxel_.empty()) {
+  while (!md_.cache_voxel_.empty())
+  {
     Eigen::Vector3i idx = md_.cache_voxel_.front();
     int idx_ctns = toAddress(idx);
     md_.cache_voxel_.pop();
+
     int depth_total = md_.depth_count_hit_and_miss_[idx_ctns];
     int lidar_total = md_.lidar_count_hit_and_miss_[idx_ctns];
     int depth_hits = md_.depth_count_hit_[idx_ctns];
     int lidar_hits = md_.lidar_count_hit_[idx_ctns];
-    auto [depth_update, depth_reliability] = modality_update(
-        idx_ctns, depth_total, depth_hits, static_cast<double>(md_.depth_dist_sum_[idx_ctns]),
-        mp_.depth_decay_distance_, mp_.depth_min_scale_, mp_.depth_hit_scale_, mp_.depth_miss_scale_);
-    auto [lidar_update, lidar_reliability] = modality_update(
-        idx_ctns, lidar_total, lidar_hits, static_cast<double>(md_.lidar_dist_sum_[idx_ctns]),
-        mp_.lidar_decay_distance_, mp_.lidar_min_scale_, mp_.lidar_hit_scale_, mp_.lidar_miss_scale_);
+    int depth_miss = depth_total - depth_hits;
+    int lidar_miss = lidar_total - lidar_hits;
 
-    // 清理缓存
+    double depth_update = 0.0;
+    double lidar_update = 0.0;
+
+    if (depth_total > 0)
+    {
+      depth_update = depth_hits >= depth_miss ? mp_.prob_hit_log_ * mp_.depth_hit_scale_
+                                              : mp_.prob_miss_log_ * mp_.depth_miss_scale_;
+    }
+
+    if (lidar_total > 0)
+    {
+      lidar_update = lidar_hits >= lidar_miss ? mp_.prob_hit_log_ * mp_.lidar_hit_scale_
+                                              : mp_.prob_miss_log_ * mp_.lidar_miss_scale_;
+    }
+
     md_.depth_count_hit_[idx_ctns] = 0;
     md_.depth_count_hit_and_miss_[idx_ctns] = 0;
     md_.lidar_count_hit_[idx_ctns] = 0;
@@ -718,35 +714,36 @@ void GridMap::fuseAndUpdateOccupancy()
     md_.flag_fusion_[idx_ctns] = 0;
 
     double log_odds_update = depth_update + lidar_update;
-    // 冲突判定与统计：强证据主导，弱证据折减，避免强弱模态互相抵消
-    if (depth_update * lidar_update < 0.0) {
-      const double abs_depth = std::fabs(depth_update);
-      const double abs_lidar = std::fabs(lidar_update);
-      const bool depth_dominant = abs_depth >= abs_lidar;
-      const double dominant = depth_dominant ? depth_update : lidar_update;
-      const double weaker = depth_dominant ? lidar_update : depth_update;
-      const double dominant_rel = depth_dominant ? depth_reliability : lidar_reliability;
-      const double weaker_rel = depth_dominant ? lidar_reliability : depth_reliability;
-      const double rel_ratio = weaker_rel / std::max(1e-6, dominant_rel + weaker_rel);
-      const double weakened = weaker * mp_.fusion_conflict_scale_ * (0.5 + rel_ratio);
-      log_odds_update = dominant + weakened;
+    if (depth_update * lidar_update < 0.0)
+    {
+      log_odds_update *= mp_.fusion_conflict_scale_;
       md_.conflict_voxel_count_ += 1;
       if (mp_.publish_conflict_cloud_)
         md_.conflict_voxels_.push_back(idx);
     }
-    if (log_odds_update == 0.0) continue;
+    if (log_odds_update == 0.0)
+      continue;
 
-    double &occ = md_.occupancy_buffer_[idx_ctns];
-    if (log_odds_update >= 0 && occ >= mp_.clamp_max_log_) continue;
-    if (log_odds_update <= 0 && occ <= mp_.clamp_min_log_) {
-      occ = mp_.clamp_min_log_;
+    if (log_odds_update >= 0 && md_.occupancy_buffer_[idx_ctns] >= mp_.clamp_max_log_)
+    {
+      continue;
+    }
+    else if (log_odds_update <= 0 && md_.occupancy_buffer_[idx_ctns] <= mp_.clamp_min_log_)
+    {
+      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
       continue;
     }
 
-    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) && idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
-    if (!in_local) occ = mp_.clamp_min_log_;
+    bool in_local = idx(0) >= min_id(0) && idx(0) <= max_id(0) && idx(1) >= min_id(1) &&
+                    idx(1) <= max_id(1) && idx(2) >= min_id(2) && idx(2) <= max_id(2);
+    if (!in_local)
+    {
+      md_.occupancy_buffer_[idx_ctns] = mp_.clamp_min_log_;
+    }
 
-    occ = clip(occ + log_odds_update, mp_.clamp_min_log_, mp_.clamp_max_log_);
+    md_.occupancy_buffer_[idx_ctns] =
+        std::min(std::max(md_.occupancy_buffer_[idx_ctns] + log_odds_update, mp_.clamp_min_log_),
+                 mp_.clamp_max_log_);
     md_.fused_voxel_count_ += 1;
   }
 
@@ -964,6 +961,22 @@ void GridMap::publishConflictMap()
   conflict_pub_->publish(cloud_msg);
 }
 
+double GridMap::timestampDelta(const rclcpp::Time &lhs, const rclcpp::Time &rhs) const
+{
+  if (lhs.nanoseconds() == 0 || rhs.nanoseconds() == 0)
+    return std::numeric_limits<double>::infinity();
+
+  return fabs((lhs - rhs).seconds());
+}
+
+bool GridMap::isTimestampFresh(const rclcpp::Time &reference, const rclcpp::Time &sample, double tolerance) const
+{
+  if (reference.nanoseconds() == 0 || sample.nanoseconds() == 0)
+    return false;
+
+  return timestampDelta(reference, sample) <= tolerance;
+}
+
 void GridMap::updateOccupancyCallback()
 {
   if (md_.last_occ_update_time_.seconds() < 1.0)
@@ -1007,13 +1020,15 @@ void GridMap::updateOccupancyCallback()
 
   if (mp_.use_lidar_buffer_ && md_.has_lidar_)
   {
-    if (md_.last_depth_time_.nanoseconds() > 0 && md_.last_lidar_time_.nanoseconds() > 0)
+    const double sync_dt = timestampDelta(md_.last_depth_time_, md_.last_lidar_time_);
+    const bool odom_fresh_for_depth = isTimestampFresh(md_.last_depth_time_, md_.last_odom_time_, mp_.odom_fallback_timeout_);
+    const bool odom_fresh_for_lidar = isTimestampFresh(md_.last_lidar_time_, md_.last_odom_time_, mp_.odom_fallback_timeout_);
+
+    if ((sync_dt <= mp_.lidar_sync_tolerance_ ||
+         (sync_dt <= mp_.lidar_sync_tolerance_relaxed_ && odom_fresh_for_depth && odom_fresh_for_lidar)) &&
+        md_.last_depth_time_.nanoseconds() > 0 && md_.last_lidar_time_.nanoseconds() > 0)
     {
-      double dt = fabs((md_.last_depth_time_ - md_.last_lidar_time_).seconds());
-      if (dt <= mp_.lidar_sync_tolerance_)
-      {
-        integrateLidarCloud(md_.last_lidar_cloud_);
-      }
+      integrateLidarCloud(md_.last_lidar_cloud_);
     }
     md_.has_lidar_ = false;
   }
@@ -1079,6 +1094,8 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr &img,
 
 void GridMap::odomCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
 {
+  md_.last_odom_time_ = odom->header.stamp;
+
   if (md_.has_first_depth_)
     return;
 
@@ -1345,18 +1362,25 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
 
   if (mp_.use_lidar_buffer_)
   {
-    bool depth_stale = false;
-    if (!md_.flag_use_depth_fusion || md_.last_depth_time_.nanoseconds() == 0)
+    if (!md_.has_odom_ || md_.last_odom_time_.nanoseconds() == 0)
     {
-      depth_stale = true;
-    }
-    else
-    {
-      double dt = fabs((node_->now() - md_.last_depth_time_).seconds());
-      depth_stale = dt > mp_.lidar_fallback_timeout_;
+      md_.has_lidar_ = false;
+      return;
     }
 
-    if (depth_stale)
+    const double lidar_depth_dt = timestampDelta(md_.last_lidar_time_, md_.last_depth_time_);
+    const bool depth_ready = md_.flag_use_depth_fusion && md_.last_depth_time_.nanoseconds() > 0;
+    if (!depth_ready)
+    {
+      md_.has_lidar_ = false;
+      return;
+    }
+
+    const bool depth_fresh = depth_ready && lidar_depth_dt <= mp_.lidar_fallback_timeout_;
+    const bool odom_fresh = isTimestampFresh(md_.last_lidar_time_, md_.last_odom_time_, mp_.odom_fallback_timeout_);
+    const bool aligned_for_buffer = depth_fresh && lidar_depth_dt <= mp_.lidar_sync_tolerance_relaxed_;
+
+    if (!depth_fresh || !odom_fresh || md_.flag_depth_odom_timeout_)
     {
       integrateLidarCloud(cloud_input);
 
@@ -1370,8 +1394,18 @@ void GridMap::inputPointCloud(const sensor_msgs::msg::PointCloud2::SharedPtr msg
       return;
     }
 
-    md_.last_lidar_cloud_ = cloud_input;
-    md_.has_lidar_ = true;
+    if (aligned_for_buffer)
+    {
+      md_.last_lidar_cloud_ = cloud_input;
+      md_.has_lidar_ = true;
+    }
+    else
+    {
+      md_.has_lidar_ = false;
+      RCLCPP_WARN_THROTTLE(node_->get_logger(), *node_->get_clock(), 1000,
+                           "drop stale lidar cloud: depth-lidar dt=%.3f exceeds relaxed tolerance %.3f",
+                           lidar_depth_dt, mp_.lidar_sync_tolerance_relaxed_);
+    }
     return;
   }
 
@@ -1518,6 +1552,8 @@ void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
                                 const nav_msgs::msg::Odometry::ConstPtr &odom)
 {
   md_.last_depth_time_ = img->header.stamp;
+  md_.last_odom_time_ = odom->header.stamp;
+  md_.flag_depth_odom_timeout_ = false;
 
   /* get pose */
   Eigen::Quaterniond body_q = Eigen::Quaterniond(odom->pose.pose.orientation.w,
@@ -1548,5 +1584,6 @@ void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr &img,
   cv_ptr->image.copyTo(md_.depth_image_);
 
   md_.occ_need_update_ = true;
+  md_.has_odom_ = true;
   md_.flag_use_depth_fusion = true;
 }
