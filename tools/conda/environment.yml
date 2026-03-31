@@ -1,0 +1,7 @@
+name: ego-fusion-py310
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy>=1.26,<3
+  - pip

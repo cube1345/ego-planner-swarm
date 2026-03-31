@@ -1,20 +1,25 @@
-import os
-
 from launch import LaunchDescription
-import launch_ros.actions
-import launch_ros.descriptions
-from ament_index_python.packages import get_package_share_directory
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
 
 def generate_launch_description():
-    rviz_config_path = os.path.join(get_package_share_directory('ego_planner'), 'launch', 'default.rviz')
-    rviz_node = launch_ros.actions.Node(
-            package='rviz2', executable='rviz2', output='screen',
-            arguments=['--display-config', rviz_config_path])
+    rviz_config = LaunchConfiguration('rviz_config')
 
-    # 定义 LaunchDescription
-    ld = LaunchDescription()
-
-    # 添加节点
-    ld.add_action(rviz_node)
-
-    return ld
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'rviz_config',
+            default_value='default.rviz',
+            description='RViz config file located in ego_planner/launch',
+        ),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            output='screen',
+            arguments=['--display-config', PathJoinSubstitution([
+                FindPackageShare('ego_planner'), 'launch', rviz_config,
+            ])],
+        ),
+    ])

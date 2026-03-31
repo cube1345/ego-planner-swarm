@@ -18,6 +18,10 @@ find_package(geometry_msgs REQUIRED)
 find_package(quadrotor_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(message_filters REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(plan_env REQUIRED)
 find_package(path_searching REQUIRED)
 find_package(bspline_opt REQUIRED)
@@ -27,6 +31,7 @@ find_package(cv_bridge REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
+find_package(CURL REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -68,6 +73,7 @@ find_library(TRAJ_UTILS_LIB traj_utils_lib PATHS ${traj_utils_LIBRARY_DIRS})
 
 target_link_libraries(ego_planner_node
     ${TRAJ_UTILS_LIB}
+    CURL::libcurl
 )
 
 add_executable(traj_server src/traj_server.cpp)
@@ -79,9 +85,24 @@ ament_target_dependencies(traj_server
                           path_searching bspline_opt 
                           traj_utils cv_bridge pcl_conversions)
 
+target_link_libraries(traj_server
+  CURL::libcurl
+)
+
+add_executable(multi_sensor_fusion_node src/multi_sensor_fusion_node.cpp)
+
+ament_target_dependencies(multi_sensor_fusion_node
+                          rclcpp sensor_msgs geometry_msgs
+                          message_filters tf2 tf2_ros
+                          cv_bridge pcl_conversions)
+
+target_link_libraries(multi_sensor_fusion_node
+  CURL::libcurl
+)
+
 # Install targets
 install(
-  TARGETS ego_planner_node traj_server
+  TARGETS ego_planner_node traj_server multi_sensor_fusion_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -90,5 +111,14 @@ install(
   DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
 )
+
+
+install(
+  PROGRAMS
+    scripts/simulated_lidar_cloud.py
+    scripts/ros2_lidar_depth_fusion_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 ament_package()
