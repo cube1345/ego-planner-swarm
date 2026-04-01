@@ -146,6 +146,8 @@ def generate_launch_description():
             {'grid_map/local_update_range_y': 5.5},
             {'grid_map/local_update_range_z': 4.5},
             {'grid_map/obstacles_inflation': 0.099},
+            {'grid_map/self_clearance_xy': 0.35},
+            {'grid_map/self_clearance_z': 0.25},
             {'grid_map/local_map_margin': 10},
             {'grid_map/ground_height': -0.01},
             # camera parameter

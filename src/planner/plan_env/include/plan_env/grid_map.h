@@ -56,6 +56,7 @@ struct MappingParameters
   Eigen::Vector3d local_update_range_;
   double resolution_, resolution_inv_;
   double obstacles_inflation_;
+  double self_clearance_xy_, self_clearance_z_;
   string frame_id_;
   int pose_type_;
 
@@ -219,6 +220,7 @@ private:
   void projectDepthImage();
   void raycastProcess();
   void clearAndInflateLocalMap();
+  void clearRobotFootprint();
 
   inline void inflatePoint(const Eigen::Vector3i &pt, int step, vector<Eigen::Vector3i> &pts);
   int setCacheOccupancy(Eigen::Vector3d pos, int occ);

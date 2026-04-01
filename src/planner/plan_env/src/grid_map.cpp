@@ -17,6 +17,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->declare_parameter("grid_map/local_update_range_y", -1.0);
   node_->declare_parameter("grid_map/local_update_range_z", -1.0);
   node_->declare_parameter("grid_map/obstacles_inflation", -1.0);
+  node_->declare_parameter("grid_map/self_clearance_xy", 0.35);
+  node_->declare_parameter("grid_map/self_clearance_z", 0.25);
   node_->declare_parameter("grid_map/fx", -1.0);
   node_->declare_parameter("grid_map/fy", -1.0);
   node_->declare_parameter("grid_map/cx", -1.0);
@@ -54,6 +56,8 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/local_update_range_y", mp_.local_update_range_(1));
   node_->get_parameter("grid_map/local_update_range_z", mp_.local_update_range_(2));
   node_->get_parameter("grid_map/obstacles_inflation", mp_.obstacles_inflation_);
+  node_->get_parameter("grid_map/self_clearance_xy", mp_.self_clearance_xy_);
+  node_->get_parameter("grid_map/self_clearance_z", mp_.self_clearance_z_);
   node_->get_parameter("grid_map/fx", mp_.fx_);
   node_->get_parameter("grid_map/fy", mp_.fy_);
   node_->get_parameter("grid_map/cx", mp_.cx_);
@@ -700,6 +704,38 @@ void GridMap::clearAndInflateLocalMap()
   }
 }
 
+void GridMap::clearRobotFootprint()
+{
+  if (!md_.has_odom_ || mp_.self_clearance_xy_ <= 0.0 || mp_.self_clearance_z_ <= 0.0)
+    return;
+
+  Eigen::Vector3d min_pos = md_.camera_pos_ - Eigen::Vector3d(mp_.self_clearance_xy_, mp_.self_clearance_xy_, mp_.self_clearance_z_);
+  Eigen::Vector3d max_pos = md_.camera_pos_ + Eigen::Vector3d(mp_.self_clearance_xy_, mp_.self_clearance_xy_, mp_.self_clearance_z_);
+  Eigen::Vector3i min_id, max_id;
+  posToIndex(min_pos, min_id);
+  posToIndex(max_pos, max_id);
+  boundIndex(min_id);
+  boundIndex(max_id);
+
+  const double xy_sq = mp_.self_clearance_xy_ * mp_.self_clearance_xy_;
+  const double z_limit = mp_.self_clearance_z_;
+
+  for (int x = min_id(0); x <= max_id(0); ++x)
+    for (int y = min_id(1); y <= max_id(1); ++y)
+      for (int z = min_id(2); z <= max_id(2); ++z)
+      {
+        Eigen::Vector3d pos;
+        indexToPos(Eigen::Vector3i(x, y, z), pos);
+        Eigen::Vector3d delta = pos - md_.camera_pos_;
+        if (delta.head<2>().squaredNorm() > xy_sq || fabs(delta(2)) > z_limit)
+          continue;
+
+        const int idx = toAddress(x, y, z);
+        md_.occupancy_buffer_inflate_[idx] = 0;
+        md_.occupancy_buffer_[idx] = mp_.clamp_min_log_;
+      }
+}
+
 void GridMap::visCallback()
 {
   publishMapInflate(true);
@@ -912,6 +948,10 @@ void GridMap::cloudCallback(const sensor_msgs::msg::PointCloud2::ConstPtr &img)
         md_.occupancy_buffer_inflate_[toAddress(x, y, ceil_id)] = 1;
       }
   }
+
+  // Keep the vehicle footprint traversable so the planner can recover from
+  // slight penetration into inflated obstacles caused by dynamics / latency.
+  clearRobotFootprint();
 }
 
 void GridMap::publishMap()
