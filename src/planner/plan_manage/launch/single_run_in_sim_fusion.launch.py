@@ -21,6 +21,16 @@ def launch_setup(context, *args, **kwargs):
     fusion_python_executable = LaunchConfiguration('fusion_python_executable').perform(context)
     use_fusion = LaunchConfiguration('use_fusion')
     use_fusion_value = LaunchConfiguration('use_fusion').perform(context).lower() in ('1', 'true', 'yes')
+    adaptive_min_probability_enable = LaunchConfiguration('adaptive_min_probability_enable').perform(context)
+    min_probability = LaunchConfiguration('min_probability').perform(context)
+    adaptive_min_probability_min = LaunchConfiguration('adaptive_min_probability_min').perform(context)
+    adaptive_min_probability_max = LaunchConfiguration('adaptive_min_probability_max').perform(context)
+    adaptive_min_probability_step = LaunchConfiguration('adaptive_min_probability_step').perform(context)
+    adaptive_target_retention = LaunchConfiguration('adaptive_target_retention').perform(context)
+    adaptive_retention_band = LaunchConfiguration('adaptive_retention_band').perform(context)
+    adaptive_eval_range = LaunchConfiguration('adaptive_eval_range').perform(context)
+    adaptive_min_gt_voxels = LaunchConfiguration('adaptive_min_gt_voxels').perform(context)
+    adaptive_score_alpha = LaunchConfiguration('adaptive_score_alpha').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
@@ -185,6 +195,16 @@ def launch_setup(context, *args, **kwargs):
             '-p', 'publish_debug_stats_every:=20',
             '-p', 'near_field_radius:=4.0',
             '-p', 'max_range:=10.0',
+            '-p', f'min_probability:={min_probability}',
+            '-p', f'adaptive_min_probability_enable:={adaptive_min_probability_enable}',
+            '-p', f'adaptive_min_probability_min:={adaptive_min_probability_min}',
+            '-p', f'adaptive_min_probability_max:={adaptive_min_probability_max}',
+            '-p', f'adaptive_min_probability_step:={adaptive_min_probability_step}',
+            '-p', f'adaptive_target_retention:={adaptive_target_retention}',
+            '-p', f'adaptive_retention_band:={adaptive_retention_band}',
+            '-p', f'adaptive_eval_range:={adaptive_eval_range}',
+            '-p', f'adaptive_min_gt_voxels:={adaptive_min_gt_voxels}',
+            '-p', f'adaptive_score_alpha:={adaptive_score_alpha}',
         ],
         output='screen',
         condition=IfCondition(use_fusion),
@@ -214,5 +234,15 @@ def generate_launch_description():
         DeclareLaunchArgument('conda_env', default_value='rospy'),
         DeclareLaunchArgument('fusion_python_executable', default_value='python'),
         DeclareLaunchArgument('use_fusion', default_value='True'),
+        DeclareLaunchArgument('min_probability', default_value='0.30'),
+        DeclareLaunchArgument('adaptive_min_probability_enable', default_value='False'),
+        DeclareLaunchArgument('adaptive_min_probability_min', default_value='0.20'),
+        DeclareLaunchArgument('adaptive_min_probability_max', default_value='0.35'),
+        DeclareLaunchArgument('adaptive_min_probability_step', default_value='0.02'),
+        DeclareLaunchArgument('adaptive_target_retention', default_value='0.30'),
+        DeclareLaunchArgument('adaptive_retention_band', default_value='0.05'),
+        DeclareLaunchArgument('adaptive_eval_range', default_value='10.0'),
+        DeclareLaunchArgument('adaptive_min_gt_voxels', default_value='40'),
+        DeclareLaunchArgument('adaptive_score_alpha', default_value='0.35'),
         OpaqueFunction(function=launch_setup),
     ])

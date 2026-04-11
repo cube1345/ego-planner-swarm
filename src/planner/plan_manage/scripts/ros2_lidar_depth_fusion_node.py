@@ -19,7 +19,7 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, Tuple
+from typing import Dict, Iterable, Set, Tuple
 
 import message_filters
 import numpy as np
@@ -50,6 +50,13 @@ class VoxelEvidence:
     seen_lidar: bool = False
 
 
+@dataclass
+class Scores:
+    precision: float
+    recall: float
+    f1: float
+
+
 class LidarDepthFusionNode(Node):
     def __init__(self) -> None:
         super().__init__("lidar_depth_fusion_node")
@@ -59,6 +66,7 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("odom_topic", "/drone_0_visual_slam/odom")
         self.declare_parameter("output_topic", "/drone_0_fusion/fused_cloud")
         self.declare_parameter("output_frame", "world")
+        self.declare_parameter("global_cloud_topic", "/map_generator/global_cloud")
         self.declare_parameter("resolution", 0.10)
         self.declare_parameter("z_min", -0.10)
         self.declare_parameter("z_max", 3.50)
@@ -66,8 +74,17 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("near_field_radius", 4.0)
         self.declare_parameter("depth_decay", 4.5)
         self.declare_parameter("lidar_growth", 5.0)
-        self.declare_parameter("min_probability", 0.55)
+        self.declare_parameter("min_probability", 0.30)
         self.declare_parameter("min_hits", 1)
+        self.declare_parameter("adaptive_min_probability_enable", False)
+        self.declare_parameter("adaptive_min_probability_min", 0.20)
+        self.declare_parameter("adaptive_min_probability_max", 0.35)
+        self.declare_parameter("adaptive_min_probability_step", 0.02)
+        self.declare_parameter("adaptive_target_retention", 0.30)
+        self.declare_parameter("adaptive_retention_band", 0.05)
+        self.declare_parameter("adaptive_eval_range", 10.0)
+        self.declare_parameter("adaptive_min_gt_voxels", 40)
+        self.declare_parameter("adaptive_score_alpha", 0.35)
         self.declare_parameter("sync_queue", 10)
         self.declare_parameter("sync_slop", 0.08)
         self.declare_parameter("publish_debug_stats_every", 20)
@@ -77,6 +94,7 @@ class LidarDepthFusionNode(Node):
         self.odom_topic = str(self.get_parameter("odom_topic").value)
         self.output_topic = str(self.get_parameter("output_topic").value)
         self.output_frame = str(self.get_parameter("output_frame").value)
+        self.global_cloud_topic = str(self.get_parameter("global_cloud_topic").value)
         self.resolution = float(self.get_parameter("resolution").value)
         self.z_min = float(self.get_parameter("z_min").value)
         self.z_max = float(self.get_parameter("z_max").value)
@@ -86,15 +104,49 @@ class LidarDepthFusionNode(Node):
         self.lidar_growth = float(self.get_parameter("lidar_growth").value)
         self.min_probability = float(self.get_parameter("min_probability").value)
         self.min_hits = int(self.get_parameter("min_hits").value)
+        self.adaptive_min_probability_enable = bool(
+            self.get_parameter("adaptive_min_probability_enable").value
+        )
+        self.adaptive_min_probability_min = float(
+            self.get_parameter("adaptive_min_probability_min").value
+        )
+        self.adaptive_min_probability_max = float(
+            self.get_parameter("adaptive_min_probability_max").value
+        )
+        self.adaptive_min_probability_step = float(
+            self.get_parameter("adaptive_min_probability_step").value
+        )
+        self.adaptive_target_retention = float(
+            self.get_parameter("adaptive_target_retention").value
+        )
+        self.adaptive_retention_band = float(
+            self.get_parameter("adaptive_retention_band").value
+        )
+        self.adaptive_eval_range = float(self.get_parameter("adaptive_eval_range").value)
+        self.adaptive_min_gt_voxels = int(self.get_parameter("adaptive_min_gt_voxels").value)
+        self.adaptive_score_alpha = float(self.get_parameter("adaptive_score_alpha").value)
         sync_queue = int(self.get_parameter("sync_queue").value)
         sync_slop = float(self.get_parameter("sync_slop").value)
         self.debug_period = int(self.get_parameter("publish_debug_stats_every").value)
+        self.candidate_probabilities = self.build_probability_candidates()
+        self.candidate_scores = {
+            threshold: None for threshold in self.candidate_probabilities
+        }
+        if self.adaptive_min_probability_enable and self.candidate_probabilities:
+            center_index = len(self.candidate_probabilities) // 2
+            self.current_min_probability = float(self.candidate_probabilities[center_index])
+        else:
+            self.current_min_probability = float(self.min_probability)
 
         self.vehicle_position = np.zeros(3, dtype=np.float64)
         self.have_odom = False
+        self.have_global = False
         self.frame_count = 0
+        self.global_keys = np.empty((0, 3), dtype=np.int32)
+        self.global_centers = np.empty((0, 3), dtype=np.float32)
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 20)
+        self.create_subscription(PointCloud2, self.global_cloud_topic, self.global_cloud_callback, 10)
         self.fused_pub = self.create_publisher(PointCloud2, self.output_topic, 10)
 
         self.depth_sub = message_filters.Subscriber(self, PointCloud2, self.depth_cloud_topic)
@@ -121,6 +173,18 @@ class LidarDepthFusionNode(Node):
         ]
         self.have_odom = True
 
+    def global_cloud_callback(self, msg: PointCloud2) -> None:
+        points = self.cloud_to_xyz(msg)
+        points = self.filter_points(points, range_limit=self.max_range)
+        keys = self.voxel_keys(points)
+        if keys.size == 0:
+            self.global_keys = np.empty((0, 3), dtype=np.int32)
+            self.global_centers = np.empty((0, 3), dtype=np.float32)
+        else:
+            self.global_keys = keys
+            self.global_centers = (keys.astype(np.float32) + 0.5) * self.resolution
+        self.have_global = True
+
     def sync_callback(self, depth_msg: PointCloud2, lidar_msg: PointCloud2) -> None:
         if not self.have_odom:
             self.get_logger().warn("Skipping fusion frame: odom not available yet.")
@@ -132,7 +196,11 @@ class LidarDepthFusionNode(Node):
         depth_pts = self.filter_points(depth_pts)
         lidar_pts = self.filter_points(lidar_pts)
 
-        fused_points, stats = self.fuse_clouds(depth_pts, lidar_pts)
+        fusion_state = self.build_fusion_state(depth_pts, lidar_pts)
+        self.auto_tune_min_probability(fusion_state, depth_pts, lidar_pts)
+        fused_points, stats = self.select_fused_points(
+            fusion_state, self.current_min_probability
+        )
         template_msg = depth_msg if stamp_to_ns(depth_msg.header.stamp) >= stamp_to_ns(lidar_msg.header.stamp) else lidar_msg
         cloud_msg = self.xyz_to_cloud(fused_points, template_msg)
         self.fused_pub.publish(cloud_msg)
@@ -143,7 +211,8 @@ class LidarDepthFusionNode(Node):
                 f"fusion frame={self.frame_count} depth_pts={stats['depth_points']} "
                 f"lidar_pts={stats['lidar_points']} fused_voxels={stats['fused_voxels']} "
                 f"depth_only={stats['depth_only_voxels']} lidar_only={stats['lidar_only_voxels']} "
-                f"dual={stats['dual_voxels']}"
+                f"dual={stats['dual_voxels']} retention={stats['retention_ratio']:.3f} "
+                f"min_prob={self.current_min_probability:.3f}"
             )
 
     def cloud_to_xyz(self, msg: PointCloud2) -> np.ndarray:
@@ -155,7 +224,7 @@ class LidarDepthFusionNode(Node):
             return np.empty((0, 3), dtype=np.float32)
         return np.asarray(pts, dtype=np.float32).reshape((-1, 3))
 
-    def filter_points(self, pts: np.ndarray) -> np.ndarray:
+    def filter_points(self, pts: np.ndarray, range_limit: float | None = None) -> np.ndarray:
         if pts.size == 0:
             return pts
         mask = np.isfinite(pts).all(axis=1)
@@ -167,7 +236,8 @@ class LidarDepthFusionNode(Node):
         if pts.size == 0:
             return pts.reshape((-1, 3))
         ranges = np.linalg.norm(pts - self.vehicle_position[None, :], axis=1)
-        return pts[ranges <= self.max_range]
+        max_allowed_range = self.max_range if range_limit is None else min(self.max_range, range_limit)
+        return pts[ranges <= max_allowed_range]
 
     def depth_probability(self, ranges: np.ndarray) -> np.ndarray:
         # Stronger in the near field, decays with distance.
@@ -213,19 +283,38 @@ class LidarDepthFusionNode(Node):
             else:
                 item.seen_lidar = True
 
-    def fuse_clouds(self, depth_pts: np.ndarray, lidar_pts: np.ndarray) -> Tuple[np.ndarray, dict]:
+    def build_fusion_state(self, depth_pts: np.ndarray, lidar_pts: np.ndarray) -> dict:
         voxels: Dict[Tuple[int, int, int], VoxelEvidence] = defaultdict(VoxelEvidence)
         self.accumulate_voxels(voxels, depth_pts, "depth")
         self.accumulate_voxels(voxels, lidar_pts, "lidar")
 
+        candidate_voxels = len(voxels)
+        voxel_probabilities: Dict[Tuple[int, int, int], float] = {}
+
+        for key, evidence in voxels.items():
+            probability = float(sigmoid(np.array([evidence.logit_sum], dtype=np.float32))[0])
+            voxel_probabilities[key] = probability
+
+        return {
+            "voxels": voxels,
+            "depth_points": int(depth_pts.shape[0]),
+            "lidar_points": int(lidar_pts.shape[0]),
+            "candidate_voxels": int(candidate_voxels),
+            "voxel_probabilities": voxel_probabilities,
+            "voxel_hits": {key: evidence.hits for key, evidence in voxels.items()},
+        }
+
+    def select_fused_points(self, fusion_state: dict, threshold: float) -> Tuple[np.ndarray, dict]:
+        voxels = fusion_state["voxels"]
+        voxel_probabilities = fusion_state["voxel_probabilities"]
         fused = []
         depth_only = 0
         lidar_only = 0
         dual = 0
 
         for key, evidence in voxels.items():
-            probability = float(sigmoid(np.array([evidence.logit_sum], dtype=np.float32))[0])
-            if probability < self.min_probability or evidence.hits < self.min_hits:
+            probability = float(voxel_probabilities[key])
+            if probability < threshold or evidence.hits < self.min_hits:
                 continue
             if evidence.seen_depth and evidence.seen_lidar:
                 dual += 1
@@ -241,14 +330,139 @@ class LidarDepthFusionNode(Node):
             fused_np = np.empty((0, 3), dtype=np.float32)
 
         stats = {
-            "depth_points": int(depth_pts.shape[0]),
-            "lidar_points": int(lidar_pts.shape[0]),
+            "depth_points": fusion_state["depth_points"],
+            "lidar_points": fusion_state["lidar_points"],
+            "candidate_voxels": fusion_state["candidate_voxels"],
             "fused_voxels": int(fused_np.shape[0]),
             "depth_only_voxels": depth_only,
             "lidar_only_voxels": lidar_only,
             "dual_voxels": dual,
+            "retention_ratio": float(
+                fused_np.shape[0] / max(1, fusion_state["candidate_voxels"])
+            ),
         }
         return fused_np, stats
+
+    def auto_tune_min_probability(
+        self, fusion_state: dict, depth_pts: np.ndarray, lidar_pts: np.ndarray
+    ) -> None:
+        if not self.adaptive_min_probability_enable:
+            return
+        if not self.have_global or self.global_keys.size == 0:
+            return
+
+        local_gt_mask = (
+            np.linalg.norm(self.global_centers - self.vehicle_position[None, :], axis=1)
+            <= self.adaptive_eval_range
+        )
+        if not np.any(local_gt_mask):
+            return
+        gt_keys = self.keys_to_set(self.global_keys[local_gt_mask])
+        if len(gt_keys) < self.adaptive_min_gt_voxels:
+            return
+
+        depth_keys = self.points_to_local_eval_keys(depth_pts)
+        lidar_keys = self.points_to_local_eval_keys(lidar_pts)
+        depth_scores = self.compute_scores(depth_keys, gt_keys)
+        lidar_scores = self.compute_scores(lidar_keys, gt_keys)
+        best_single_recall = max(depth_scores.recall, lidar_scores.recall)
+        best_single_f1 = max(depth_scores.f1, lidar_scores.f1)
+
+        best_probability = self.current_min_probability
+        best_score = None
+        voxel_probabilities = fusion_state.get("voxel_probabilities", {})
+        voxel_hits = fusion_state.get("voxel_hits", {})
+
+        for threshold in self.candidate_probabilities:
+            predicted = {
+                key
+                for key, probability in voxel_probabilities.items()
+                if probability >= threshold and int(voxel_hits.get(key, 0)) >= self.min_hits
+            }
+            predicted = self.limit_keys_to_eval_range(predicted)
+            scores = self.compute_scores(predicted, gt_keys)
+            gain_recall = scores.recall - best_single_recall
+            gain_f1 = scores.f1 - best_single_f1
+            utility = gain_f1 + 0.35 * gain_recall
+            previous = self.candidate_scores[threshold]
+            ema_score = (
+                utility
+                if previous is None
+                else (1.0 - self.adaptive_score_alpha) * previous
+                + self.adaptive_score_alpha * utility
+            )
+            self.candidate_scores[threshold] = ema_score
+            if best_score is None or ema_score > best_score + 1e-9:
+                best_score = ema_score
+                best_probability = threshold
+            elif best_score is not None and abs(ema_score - best_score) <= 1e-9:
+                best_probability = min(best_probability, threshold)
+
+        self.current_min_probability = min(
+            self.adaptive_min_probability_max,
+            max(self.adaptive_min_probability_min, best_probability),
+        )
+
+    def build_probability_candidates(self) -> list[float]:
+        lower = min(self.adaptive_min_probability_min, self.adaptive_min_probability_max)
+        upper = max(self.adaptive_min_probability_min, self.adaptive_min_probability_max)
+        step = max(self.adaptive_min_probability_step, 1e-3)
+        candidate_values = []
+        current = lower
+        while current <= upper + 1e-9:
+            candidate_values.append(round(current, 4))
+            current += step
+        if not candidate_values:
+            candidate_values = [round(self.min_probability, 4)]
+        return candidate_values
+
+    def voxel_keys(self, pts: np.ndarray) -> np.ndarray:
+        if pts.size == 0:
+            return np.empty((0, 3), dtype=np.int32)
+        keys = np.floor(pts / self.resolution).astype(np.int32)
+        return np.unique(keys, axis=0)
+
+    def keys_to_set(self, keys: np.ndarray) -> Set[Tuple[int, int, int]]:
+        return {(int(k[0]), int(k[1]), int(k[2])) for k in keys}
+
+    def points_to_local_eval_keys(self, pts: np.ndarray) -> Set[Tuple[int, int, int]]:
+        keys = self.voxel_keys(pts)
+        if keys.size == 0:
+            return set()
+        centers = (keys.astype(np.float32) + 0.5) * self.resolution
+        mask = (
+            np.linalg.norm(centers - self.vehicle_position[None, :], axis=1)
+            <= self.adaptive_eval_range
+        )
+        if not np.any(mask):
+            return set()
+        return self.keys_to_set(keys[mask])
+
+    def limit_keys_to_eval_range(self, keys: Set[Tuple[int, int, int]]) -> Set[Tuple[int, int, int]]:
+        limited = set()
+        for key in keys:
+            center = (np.array(key, dtype=np.float32) + 0.5) * self.resolution
+            if np.linalg.norm(center - self.vehicle_position) <= self.adaptive_eval_range:
+                limited.add(key)
+        return limited
+
+    def compute_scores(
+        self, pred: Set[Tuple[int, int, int]], gt: Set[Tuple[int, int, int]]
+    ) -> Scores:
+        pred_size = len(pred)
+        gt_size = len(gt)
+        if gt_size == 0:
+            return Scores(precision=1.0, recall=1.0, f1=1.0)
+        if pred_size == 0:
+            return Scores(precision=0.0, recall=0.0, f1=0.0)
+        true_positive = len(pred & gt)
+        precision = true_positive / max(1, pred_size)
+        recall = true_positive / max(1, gt_size)
+        if precision + recall < 1e-9:
+            f1 = 0.0
+        else:
+            f1 = 2.0 * precision * recall / (precision + recall)
+        return Scores(precision=precision, recall=recall, f1=f1)
 
     def xyz_to_cloud(self, pts: np.ndarray, template_msg: PointCloud2) -> PointCloud2:
         header = template_msg.header
