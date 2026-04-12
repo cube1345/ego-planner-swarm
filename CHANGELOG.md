@@ -13,7 +13,21 @@
 ### Launch And Tooling
 
 - Extended `src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py` to pass adaptive tuning parameters into the fusion node.
+- Aligned the fusion simulation launch with the normal single-sensor scene by using the `random_forest` layout, restoring the straight-line waypoint pattern, and setting the default `map_size_y` back to `25.0` for easier RViz comparison.
 - Added `tools/compare_fusion.sh` for deterministic fusion A/B evaluation on `mockamap(seed=127)`.
+
+### Adaptive Parameter Principle
+
+- The adaptive parameter currently focuses on the fusion-layer obstacle acceptance threshold `min_probability` rather than planner weights or state-estimation gains.
+- For every synchronized depth and lidar frame, the node first builds a shared voxel evidence table. Each voxel accumulates log-odds style support from depth and lidar observations.
+- The node then evaluates multiple candidate `min_probability` values inside the configured range `adaptive_min_probability_min ~ adaptive_min_probability_max`.
+- For each candidate threshold, the node converts the accepted voxels into a local obstacle set and compares it against the local ground-truth obstacle voxels from `/map_generator/global_cloud`.
+- The scoring target is not raw fusion `f1`. Instead, it optimizes relative benefit over the stronger single sensor:
+  `utility = gain_f1 + 0.35 * gain_recall`
+- Here, `gain_f1` means `fusion_f1 - best_single_f1`, and `gain_recall` means `fusion_recall - best_single_recall`. This forces adaptation to prefer thresholds that create real multimodal gain rather than only increasing fused point count.
+- Candidate utilities are smoothed with an exponential moving average controlled by `adaptive_score_alpha`, which suppresses frame-level noise and reduces threshold oscillation.
+- The selected threshold is applied in the current frame before the fused cloud is published, so the planner immediately consumes the newly selected obstacle map.
+- In the current validated configuration, the profitable search region is concentrated in the low-threshold band `0.20 ~ 0.35`, with the adaptive process frequently converging toward the lower boundary when denser obstacle retention improves net gain.
 
 ### Verified Results
 
