@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
@@ -73,8 +75,14 @@ class SimFlightStatsReport(Node):
         self.occ_latest_points = 0
         self.occ_peak_points = 0
 
-        self.replan_base_total = self.scan_replan_total()
-        self.replan_final_total = self.replan_base_total
+        if args.launch_log_path:
+            # The redirected batch launch log starts recording before this node starts.
+            # Use zero baseline so early replans are still counted for this run.
+            self.replan_base_total = 0
+            self.replan_final_total = 0
+        else:
+            self.replan_base_total = self.scan_replan_total()
+            self.replan_final_total = self.replan_base_total
 
         self.odom_count = 0
         self.path_length = 0.0
@@ -85,12 +93,15 @@ class SimFlightStatsReport(Node):
         self.prev_pos: Optional[np.ndarray] = None
         self.prev_odom_time: Optional[float] = None
         self.goal_reached_time: Optional[float] = None
+        self.finished = False
 
         self.turn_threshold_rad = math.radians(float(args.turn_angle_deg))
         self.min_turn_separation_sec = float(args.min_turn_separation_sec)
         self.min_segment_distance = float(args.min_segment_distance)
         self.goal = np.array([float(args.goal_x), float(args.goal_y), float(args.goal_z)], dtype=np.float64)
         self.goal_tol = float(args.goal_tolerance)
+        self.goal_exit_margin = float(args.goal_exit_margin)
+        self.left_goal_region = False
 
         self.global_sub = self.create_subscription(
             PointCloud2, args.global_cloud_topic, self.global_cloud_callback, 10
@@ -151,22 +162,32 @@ class SimFlightStatsReport(Node):
             self.occ_peak_points = count
 
     def scan_replan_total(self) -> int:
+        if self.args.launch_log_path:
+            launch_log = Path(self.args.launch_log_path)
+            if launch_log.is_file():
+                return self.scan_replan_from_files([launch_log])
         root = Path(self.args.replan_log_root)
         if not root.exists():
             return 0
+        return self.scan_replan_from_files(self.collect_replan_files(root))
+
+    def collect_replan_files(self, root: Path) -> List[Path]:
+        candidates = [p for p in root.rglob("ego_planner_node*.log") if p.is_file()]
+        launch_logs = [p for p in root.rglob("launch.log") if p.is_file()]
+        candidate_map = {str(p.resolve()): p for p in candidates + launch_logs}
+        if not candidate_map:
+            candidate_map = {str(p.resolve()): p for p in root.rglob("*") if p.is_file()}
+        return sorted(
+            candidate_map.values(),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[: int(self.args.replan_log_file_limit)]
+
+    def scan_replan_from_files(self, files: List[Path]) -> int:
         indexed_pattern = re.compile(r"\[drone\s+\d+\s+replan\s+(\d+)\]")
         warn_pattern = re.compile(r"current traj in collision, replan\.", re.IGNORECASE)
         max_index = -1
         warn_count = 0
-
-        candidates = [p for p in root.rglob("ego_planner_node*.log") if p.is_file()]
-        if not candidates:
-            candidates = [p for p in root.rglob("*") if p.is_file()]
-        files = sorted(
-            candidates,
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )[: int(self.args.replan_log_file_limit)]
 
         for file in files:
             try:
@@ -185,6 +206,7 @@ class SimFlightStatsReport(Node):
 
     def odom_callback(self, msg: Odometry) -> None:
         now = time.time()
+        odom_time = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
         pos = np.array(
             [msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z],
             dtype=np.float64,
@@ -193,7 +215,7 @@ class SimFlightStatsReport(Node):
 
         if self.prev_pos is not None:
             dist = float(np.linalg.norm(pos - self.prev_pos))
-            dt = max(1e-6, now - (self.prev_odom_time or now))
+            dt = max(1e-6, odom_time - (self.prev_odom_time or odom_time))
             self.path_length += dist
             speed = dist / dt
             if speed > self.max_speed:
@@ -213,27 +235,32 @@ class SimFlightStatsReport(Node):
                 self.last_heading = heading
 
         self.prev_pos = pos
-        self.prev_odom_time = now
+        self.prev_odom_time = odom_time
+
+        dist_to_goal = float(np.linalg.norm(pos - self.goal))
+        if dist_to_goal > (self.goal_tol + self.goal_exit_margin):
+            self.left_goal_region = True
 
         if self.goal_reached_time is None:
-            if float(np.linalg.norm(pos - self.goal)) <= self.goal_tol:
+            if self.left_goal_region and dist_to_goal <= self.goal_tol:
                 self.goal_reached_time = now - self.start_wall
 
     def on_timer(self) -> None:
         elapsed = time.time() - self.start_wall
-        if elapsed < self.duration_sec:
-            if elapsed - self.last_wall >= 5.0:
-                self.last_wall = elapsed
-                self.replan_final_total = self.scan_replan_total()
-                replan_count = max(0, self.replan_final_total - self.replan_base_total)
-                self.get_logger().info(
-                    f"progress {elapsed:.1f}/{self.duration_sec:.1f}s "
-                    f"replan={replan_count} turns={self.turn_count}"
-                )
+        if elapsed - self.last_wall < 5.0:
             return
-        self.finish_and_shutdown()
+        self.last_wall = elapsed
+        self.replan_final_total = self.scan_replan_total()
+        replan_count = max(0, self.replan_final_total - self.replan_base_total)
+        self.get_logger().info(
+            f"progress {elapsed:.1f}/{self.duration_sec:.1f}s "
+            f"replan={replan_count} turns={self.turn_count}"
+        )
 
     def finish_and_shutdown(self) -> None:
+        if self.finished:
+            return
+        self.finished = True
         elapsed = time.time() - self.start_wall
         self.replan_final_total = self.scan_replan_total()
         replan_count = max(0, self.replan_final_total - self.replan_base_total)
@@ -279,10 +306,10 @@ class SimFlightStatsReport(Node):
         md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
         self.write_svg_dashboard(svg_path, result)
 
-        self.get_logger().info(f"done. json={json_path}")
-        self.get_logger().info(f"done. md={md_path}")
-        self.get_logger().info(f"done. svg={svg_path}")
-        rclpy.shutdown()
+        if rclpy.ok():
+            self.get_logger().info(f"done. json={json_path}")
+            self.get_logger().info(f"done. md={md_path}")
+            self.get_logger().info(f"done. svg={svg_path}")
 
     def write_svg_dashboard(self, path: Path, result: Dict[str, object]) -> None:
         width = 1180
@@ -355,7 +382,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--global-cloud-topic", type=str, default="/map_generator/global_cloud")
     parser.add_argument("--occupancy-topic", type=str, default="/drone_0_grid/grid_map/occupancy_inflate")
     parser.add_argument("--odom-topic", type=str, default="/drone_0_visual_slam/odom")
-    parser.add_argument("--replan-log-root", type=str, default="/tmp/ros_logs")
+    parser.add_argument("--launch-log-path", type=str, default="")
+    parser.add_argument("--replan-log-root", type=str, default=os.environ.get("ROS_LOG_DIR", "/tmp/ros_logs"))
     parser.add_argument("--replan-log-file-limit", type=int, default=80)
     parser.add_argument("--obstacle-voxel-size", type=float, default=0.20)
     parser.add_argument("--min-cluster-voxels", type=int, default=24)
@@ -368,6 +396,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goal-y", type=float, default=0.0)
     parser.add_argument("--goal-z", type=float, default=1.0)
     parser.add_argument("--goal-tolerance", type=float, default=0.6)
+    parser.add_argument("--goal-exit-margin", type=float, default=1.0)
     return parser.parse_args()
 
 
@@ -389,7 +418,11 @@ def main() -> None:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
+    except ExternalShutdownException:
+        node.finish_and_shutdown()
     finally:
+        if not node.finished:
+            node.finish_and_shutdown()
         if rclpy.ok():
             node.destroy_node()
             rclpy.shutdown()

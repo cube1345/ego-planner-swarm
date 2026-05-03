@@ -19,6 +19,13 @@ ADAPTIVE_STEP="0.02"
 ADAPTIVE_EVAL_RANGE="10.0"
 ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.25"
+INIT_X="-15.0"
+INIT_Y="0.0"
+INIT_Z="0.1"
+POINT_NUM="1"
+POINT0_X="15.0"
+POINT0_Y="0.0"
+POINT0_Z="1.0"
 
 usage() {
   cat <<'EOF'
@@ -39,6 +46,13 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-eval-range FLOAT
   --adaptive-min-gt-voxels INT
   --adaptive-score-alpha FLOAT
+  --init-x FLOAT
+  --init-y FLOAT
+  --init-z FLOAT
+  --point-num INT
+  --point0-x FLOAT
+  --point0-y FLOAT
+  --point0-z FLOAT
 EOF
 }
 
@@ -59,6 +73,13 @@ while [[ $# -gt 0 ]]; do
     --adaptive-eval-range) ADAPTIVE_EVAL_RANGE="$2"; shift 2 ;;
     --adaptive-min-gt-voxels) ADAPTIVE_MIN_GT_VOXELS="$2"; shift 2 ;;
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
+    --init-x) INIT_X="$2"; shift 2 ;;
+    --init-y) INIT_Y="$2"; shift 2 ;;
+    --init-z) INIT_Z="$2"; shift 2 ;;
+    --point-num) POINT_NUM="$2"; shift 2 ;;
+    --point0-x) POINT0_X="$2"; shift 2 ;;
+    --point0-y) POINT0_Y="$2"; shift 2 ;;
+    --point0-z) POINT0_Z="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "unknown argument: $1" >&2
@@ -74,6 +95,9 @@ CSV_PATH="$OUT_DIR/${LABEL}.csv"
 SUMMARY_PATH="$OUT_DIR/${LABEL}.summary.json"
 LAUNCH_LOG="$OUT_DIR/${LABEL}.launch.log"
 REPORT_LOG="$OUT_DIR/${LABEL}.report.log"
+RUN_LOG_DIR="$OUT_DIR/${LABEL}_ros_logs"
+SIM_STATS_DIR="$OUT_DIR/${LABEL}_sim_stats"
+SIM_STATS_LOG="$OUT_DIR/${LABEL}.sim_stats.log"
 
 stop_pid() {
   local pid="$1"
@@ -105,6 +129,9 @@ stop_pid() {
 
 cleanup() {
   set +e
+  if [[ -n "${SIM_STATS_PID:-}" ]]; then
+    stop_pid "$SIM_STATS_PID"
+  fi
   if [[ -n "${REPORT_PID:-}" ]]; then
     stop_pid "$REPORT_PID"
   fi
@@ -124,12 +151,24 @@ set +u
 source install/setup.bash
 set -u
 
-rm -f "$CSV_PATH" "$SUMMARY_PATH" "$LAUNCH_LOG" "$REPORT_LOG"
+rm -f "$CSV_PATH" "$SUMMARY_PATH" "$LAUNCH_LOG" "$REPORT_LOG" "$SIM_STATS_LOG"
+rm -rf "$SIM_STATS_DIR"
+rm -rf "$RUN_LOG_DIR"
+mkdir -p "$RUN_LOG_DIR"
+export ROS_LOG_DIR="$RUN_LOG_DIR"
 
 echo "[compare_fusion] launch label=$LABEL out_dir=$OUT_DIR"
+echo "[compare_fusion] ros_log_dir=$RUN_LOG_DIR"
 ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   use_fusion:=True \
   use_mockamap:="$USE_MOCKAMAP" \
+  init_x:="$INIT_X" \
+  init_y:="$INIT_Y" \
+  init_z:="$INIT_Z" \
+  point_num:="$POINT_NUM" \
+  point0_x:="$POINT0_X" \
+  point0_y:="$POINT0_Y" \
+  point0_z:="$POINT0_Z" \
   min_probability:="$MIN_PROBABILITY" \
   adaptive_min_probability_enable:="$ADAPTIVE_ENABLE" \
   adaptive_min_probability_min:="$ADAPTIVE_MIN" \
@@ -151,13 +190,30 @@ sleep "$STARTUP_WAIT"
   >"$REPORT_LOG" 2>&1 &
 REPORT_PID=$!
 
-sleep "$DURATION"
+/usr/bin/python3 tools/sim_flight_stats_report.py \
+  --duration-sec "$DURATION" \
+  --output-dir "$SIM_STATS_DIR" \
+  --global-cloud-topic /map_generator/global_cloud \
+  --occupancy-topic /drone_0_grid/grid_map/occupancy_inflate \
+  --odom-topic /drone_0_visual_slam/odom \
+  --launch-log-path "$LAUNCH_LOG" \
+  --goal-x "$POINT0_X" \
+  --goal-y "$POINT0_Y" \
+  --goal-z "$POINT0_Z" \
+  --goal-exit-margin 1.0 \
+  >"$SIM_STATS_LOG" 2>&1 &
+SIM_STATS_PID=$!
 
-stop_pid "$REPORT_PID"
-unset REPORT_PID
+sleep "$DURATION"
 
 stop_pid "$LAUNCH_PID"
 unset LAUNCH_PID
+
+stop_pid "$SIM_STATS_PID"
+unset SIM_STATS_PID
+
+stop_pid "$REPORT_PID"
+unset REPORT_PID
 
 if [[ ! -s "$CSV_PATH" ]]; then
   echo "[compare_fusion] csv not generated: $CSV_PATH" >&2

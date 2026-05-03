@@ -14,10 +14,16 @@ def launch_setup(context, *args, **kwargs):
     map_size_x = LaunchConfiguration('map_size_x').perform(context)
     map_size_y = LaunchConfiguration('map_size_y').perform(context)
     map_size_z = LaunchConfiguration('map_size_z').perform(context)
+    init_x = LaunchConfiguration('init_x').perform(context)
+    init_y = LaunchConfiguration('init_y').perform(context)
+    init_z = LaunchConfiguration('init_z').perform(context)
     odom_topic = LaunchConfiguration('odom_topic').perform(context)
+    point_num = LaunchConfiguration('point_num').perform(context)
+    point0_x = LaunchConfiguration('point0_x').perform(context)
+    point0_y = LaunchConfiguration('point0_y').perform(context)
+    point0_z = LaunchConfiguration('point0_z').perform(context)
     use_mockamap = LaunchConfiguration('use_mockamap')
     use_dynamic = LaunchConfiguration('use_dynamic')
-    conda_env = LaunchConfiguration('conda_env').perform(context)
     fusion_python_executable = LaunchConfiguration('fusion_python_executable').perform(context)
     use_fusion = LaunchConfiguration('use_fusion')
     use_fusion_value = LaunchConfiguration('use_fusion').perform(context).lower() in ('1', 'true', 'yes')
@@ -112,10 +118,10 @@ def launch_setup(context, *args, **kwargs):
             'planning_horizon': str(7.5),
             'use_distinctive_trajs': 'True',
             'flight_type': str(2),
-            'point_num': str(4),
-            'point0_x': str(15.0),
-            'point0_y': str(0.0),
-            'point0_z': str(1.0),
+            'point_num': point_num,
+            'point0_x': point0_x,
+            'point0_y': point0_y,
+            'point0_z': point0_z,
             'point1_x': str(-15.0),
             'point1_y': str(0.0),
             'point1_z': str(1.0),
@@ -151,9 +157,9 @@ def launch_setup(context, *args, **kwargs):
             'map_size_x_': map_size_x,
             'map_size_y_': map_size_y,
             'map_size_z_': map_size_z,
-            'init_x_': str(-15.0),
-            'init_y_': str(0.0),
-            'init_z_': str(0.1),
+            'init_x_': init_x,
+            'init_y_': init_y,
+            'init_z_': init_z,
             'odometry_topic': odom_topic,
         }.items(),
     )
@@ -184,7 +190,6 @@ def launch_setup(context, *args, **kwargs):
 
     fusion_process = ExecuteProcess(
         cmd=[
-            'conda', 'run', '--no-capture-output', '-n', conda_env,
             fusion_python_executable, fusion_script,
             '--ros-args',
             '-p', f'depth_cloud_topic:=/drone_{drone_id}_pcl_render_node/cloud',
@@ -228,11 +233,17 @@ def generate_launch_description():
         DeclareLaunchArgument('map_size_x', default_value='50.0'),
         DeclareLaunchArgument('map_size_y', default_value='25.0'),
         DeclareLaunchArgument('map_size_z', default_value='2.0'),
+        DeclareLaunchArgument('init_x', default_value='-15.0'),
+        DeclareLaunchArgument('init_y', default_value='0.0'),
+        DeclareLaunchArgument('init_z', default_value='0.1'),
         DeclareLaunchArgument('odom_topic', default_value='visual_slam/odom'),
+        DeclareLaunchArgument('point_num', default_value='4'),
+        DeclareLaunchArgument('point0_x', default_value='15.0'),
+        DeclareLaunchArgument('point0_y', default_value='0.0'),
+        DeclareLaunchArgument('point0_z', default_value='1.0'),
         DeclareLaunchArgument('use_mockamap', default_value='False'),
         DeclareLaunchArgument('use_dynamic', default_value='False'),
-        DeclareLaunchArgument('conda_env', default_value='rospy'),
-        DeclareLaunchArgument('fusion_python_executable', default_value='python'),
+        DeclareLaunchArgument('fusion_python_executable', default_value='/usr/bin/python3'),
         DeclareLaunchArgument('use_fusion', default_value='True'),
         DeclareLaunchArgument('min_probability', default_value='0.30'),
         DeclareLaunchArgument('adaptive_min_probability_enable', default_value='False'),
