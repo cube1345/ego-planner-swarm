@@ -1,257 +1,230 @@
-# 一种面向 EGO-Planner 的深度相机与 LiDAR 多模态融合局部感知方法
+# 一种面向 EGO-Planner 的深度相机与 LiDAR 几何融合及在线阈值自适应方法
+
+更新时间：2026-05-03
 
 ## 摘要
 
-针对四旋翼无人机在未知障碍环境中的局部避障问题，本文基于当前 ROS2 版 EGO-Planner 工程实现，提出并实现了一种深度相机与 LiDAR 的多模态几何融合方法。该方法以深度点云和 LiDAR 点云作为输入，首先通过近似时间同步保证两路观测在同一局部时刻内对齐；随后在统一世界坐标系下完成点云裁剪与体素化表达；最后采用距离自适应的概率占据证据融合策略，对近场和中远场观测赋予不同权重，在体素级别累积多源占据证据，输出可直接送入 EGO-Planner 局部地图构建模块的融合点云。与单一深度点云或单一 LiDAR 点云方案相比，当前仿真统计结果表明，该方法在平均 Recall 和平均 F1 指标上均获得稳定增益，其中相对于最优单模态的平均 Recall 增益为 0.0571，平均 F1 增益为 0.0841，且在当前评估窗口内正增益比例达到 100%。实验结果说明，该方法能够在保持工程实现简洁性的前提下，提高局部障碍感知的完整性与鲁棒性。
+针对基于 EGO-Planner 的无人机局部避障系统，本文围绕当前 ROS 2 工程实现，设计并落地了一种深度相机与 LiDAR 的几何级多模态融合方法。该方法以深度点云与模拟 LiDAR 点云为输入，通过近似时间同步、统一世界坐标系下的预处理、体素级 log-odds 占据证据累积，生成可直接送入 `grid_map/cloud` 的融合障碍点云。在此基础上，系统进一步引入一个面向融合层的在线自适应参数，即障碍接受阈值 `min_probability`。该阈值在每帧内于候选区间内搜索，并通过相对最佳单传感器的局部收益函数进行选择。当前工程验证表明，在线自适应的对象只有这一项，而其他 `adaptive_*` 参数主要用作控制自适应过程的边界与平滑超参数。现有批量评测结果显示，在已验证配置下，自适应阈值能够稳定带来正向融合收益，同时 headless 统计链路已支持可靠的 `replan_count` 和滚动融合指标采集。本文总结的重点不在于提出新型规划器，而在于说明如何以最小工程侵入方式增强 EGO-Planner 的局部障碍感知输入质量。
 
 ## 关键词
 
-无人机避障；EGO-Planner；多模态融合；深度相机；LiDAR；体素占据融合；ROS2
+无人机避障；EGO-Planner；多模态融合；深度相机；LiDAR；在线自适应参数；ROS 2
 
 ## 1. 引言
 
-在基于局部地图的无人机避障系统中，感知模块的可靠性直接决定了轨迹优化结果的可行性与安全性。单目深度相机或深度渲染点云通常具有较高的近距离空间分辨率，但在远距离、边缘区域及遮挡条件下容易出现观测不完整的问题；LiDAR 具有更稳定的几何测距能力，但在稀疏采样、近距离密集结构表达方面又存在局限。因此，将二者进行合理融合，是提升 EGO-Planner 局部地图质量的一条务实路径。
+局部轨迹优化类无人机避障系统的上限，很大程度上取决于局部障碍地图的质量。若感知输入出现空洞、时间不同步、近场或远场结构缺失，则规划器即使本身稳定，也容易生成不理想甚至不可行的轨迹。单一深度点云在近场细节表达上通常较强，但在中远距离和遮挡边界处容易出现观测不完整；单一 LiDAR 在几何测距上更稳，但在近场密集结构和垂向表达方面又有局限。因此，在不重构 EGO-Planner 主体的前提下，利用多模态融合改善 `grid_map/cloud` 的输入质量，是一个务实且工程代价可控的方向。
 
-当前工程并未采用端到端学习式融合或全局状态估计融合，而是围绕局部占据表达，设计了一套轻量化、实时友好的几何证据融合方法。该设计的目标不是替代 EGO-Planner 本身的轨迹优化逻辑，而是为其 `grid_map/cloud` 输入提供更稳定、更完整的障碍观测。
+当前工程并没有把自适应参数扩展到规划层权重或状态估计层，而是首先集中在融合层障碍接受阈值的在线调节。这样做的原因是：融合层既直接决定局部地图的稠密程度与可信度，又不会破坏原有 EGO-Planner 的优化结构，因此更适合作为第一阶段的自适应入口。
 
-## 2. 系统总体架构
+## 2. 系统架构
 
-当前仿真链路的多模态融合入口定义在 [single_run_in_sim_fusion.launch.py](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py)。当 `use_fusion=True` 时，规划器输入点云话题由原始深度点云切换为融合点云，其中 `cloud_topic` 被设置为 `fusion/fused_cloud`，见 [single_run_in_sim_fusion.launch.py:32](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:32)。随后该话题通过 [advanced_param.launch.py:108](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/advanced_param.launch.py:108) 到 [advanced_param.launch.py:109](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/advanced_param.launch.py:109) 接入 EGO-Planner 的 `grid_map/cloud`。
-
-系统中的两路感知输入分别为：
+当前融合链路由 `single_run_in_sim_fusion.launch.py` 启动。其感知输入包括：
 
 - 深度点云：`/drone_0_pcl_render_node/cloud`
 - 模拟 LiDAR 点云：`/drone_0_lidar/points`
 
-融合节点由 [single_run_in_sim_fusion.launch.py:175](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:175) 到 [single_run_in_sim_fusion.launch.py:190](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:190) 启动，实际执行脚本为 [ros2_lidar_depth_fusion_node.py](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py)。在仿真条件下，两路点云统一工作在 `world` 坐标系，因此当前版本未引入显式 TF 外参解算。
+融合输出为：
 
-## 3. 多模态融合方法
+- `/drone_0_fusion/fused_cloud`
 
-在当前工程中，所采用的融合算法并非简单点云拼接，也不是基于滤波器的状态融合，而是一种面向局部障碍表达的“距离自适应体素占据证据融合”方法。其基本思想是：将深度相机与 LiDAR 对同一空间体素的占据判断视为两类独立观测证据，并根据观测距离对二者赋予不同可信度，再通过 log-odds 累积方式获得体素最终占据概率。该设计直接服务于 EGO-Planner 的局部地图构建模块，因此关注的核心目标不是全局环境重建，而是在局部规划尺度上获得更稳定、更完整的障碍几何表达。
+随后通过 `advanced_param.launch.py` 将该输出接入规划器的 `grid_map/cloud`。
 
-### 3.1 问题建模
+对应地，原版非融合链路 `single_run_in_sim.launch.py` 不启动模拟 LiDAR 节点，也不启动融合节点，而是让 `grid_map/cloud` 直接读取深度点云。这使得当前项目天然具备“原版链路 vs 融合链路”的对比基础。
 
-设深度点云观测集合为
+## 3. 几何融合方法
 
-$$
-\mathcal{P}_d = \{ \mathbf{p}_i^d \in \mathbb{R}^3 \},
-$$
+### 3.1 基本流程
 
-LiDAR 点云观测集合为
+当前融合方法可概括为如下流程：
 
-$$
-\mathcal{P}_l = \{ \mathbf{p}_j^l \in \mathbb{R}^3 \}.
-$$
+1. 对深度点云和 LiDAR 点云做近似时间同步；
+2. 在统一坐标系下进行高度与量程裁剪；
+3. 将两路点云离散到统一体素网格；
+4. 为每个体素累积来自 depth 和 lidar 的 log-odds 占据证据；
+5. 根据体素最终概率与命中次数筛选保留体素；
+6. 将保留体素中心发布为融合点云。
 
-目标是在统一坐标系下构造融合后的占据体素集合
+因此，该方法并不是原始点级拼接，而是“体素级占据证据融合”。
 
-$$
-\mathcal{V}_f = \{ \mathbf{v}_k \},
-$$
+### 3.2 距离自适应传感器权重
 
-并将其发布为融合点云，作为局部地图更新输入。
+在当前实现中，深度点云与 LiDAR 的证据强度并不固定相同，而是与距离相关。设计直觉是：
 
-### 3.2 时间同步
+- 近场结构更信任 depth；
+- 中远场结构更信任 lidar。
 
-融合节点使用 `ApproximateTimeSynchronizer` 对深度点云与 LiDAR 点云进行近似时间同步，见 [ros2_lidar_depth_fusion_node.py:100](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:100) 到 [ros2_lidar_depth_fusion_node.py:108](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:108)。当前默认参数为：
+也就是说，当前融合器并不是只做“多传感器并集”，而是把传感器物理特性直接编码进概率模型中。
 
-- `sync_queue = 10`
-- `sync_slop = 0.08`
+### 3.3 体素证据累积
 
-其设计意图是在实时性与同步成功率之间取得平衡。由于仿真链路中深度点云时间戳为零，系统在模拟 LiDAR 端引入了 `force_zero_stamp=True` 机制，以便触发同步回调，见 [single_run_in_sim_fusion.launch.py:168](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:168) 到 [single_run_in_sim_fusion.launch.py:170](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:170) 以及 [simulated_lidar_cloud.py:145](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/simulated_lidar_cloud.py:145) 到 [simulated_lidar_cloud.py:156](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/simulated_lidar_cloud.py:156)。
-
-### 3.3 数据预处理
-
-在进入融合前，两路点云均执行相同的基础预处理，见 [ros2_lidar_depth_fusion_node.py:158](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:158) 到 [ros2_lidar_depth_fusion_node.py:170](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:170)。其处理步骤包括：
-
-1. 非有限值去除；
-2. 垂向高度裁剪；
-3. 基于无人机当前位置的最大感知半径裁剪。
-
-在当前实现中，默认参数为：
-
-- `z_min = -0.10`
-- `z_max = 3.50`
-- `max_range = 12.0`
-- `resolution = 0.10`
-
-该处理使后续融合只针对与局部规划相关的障碍观测执行，避免远距离点和异常点对局部占据判断造成污染。
-
-### 3.4 距离自适应概率模型
-
-当前融合方法的关键在于：并不将深度和 LiDAR 视作等权传感器，而是根据观测距离动态调整其占据证据强度。
-
-对深度点云，当前实现采用如下近场偏置模型，见 [ros2_lidar_depth_fusion_node.py:172](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:172) 到 [ros2_lidar_depth_fusion_node.py:176](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:176)：
+设某体素在 depth 和 lidar 下分别得到占据概率估计 $p_d$ 与 $p_l$，则可将其映射到 log-odds 形式并累加：
 
 $$
-p_d(r) = \mathrm{clip}\left(0.25 + 0.55 e^{-r / \lambda_d} + \mathbb{I}(r \le r_n)\cdot 0.10 \right),
+L = \sum \log \frac{p}{1-p}
+$$
+
+再通过 sigmoid 恢复最终占据概率：
+
+$$
+P = \frac{1}{1 + e^{-L}}
+$$
+
+若该概率高于阈值 `min_probability`，且命中次数满足 `min_hits`，则该体素进入最终融合结果。
+
+因此，`min_probability` 直接决定了障碍体素保留的松紧程度，是最适合作为当前在线自适应对象的参数。
+
+## 4. 在线自适应参数设计
+
+### 4.1 当前真正在线自适应的参数
+
+当前工程中，真正被在线调节的参数只有一个：
+
+- `current_min_probability`
+
+它来自静态基准参数：
+
+- `min_probability`
+
+并在每帧内由在线策略重新选择。
+
+### 4.2 候选空间
+
+当前实现使用以下参数定义候选搜索空间：
+
+- `adaptive_min_probability_min`
+- `adaptive_min_probability_max`
+- `adaptive_min_probability_step`
+
+在当前项目默认配置下，候选区间为：
+
+$$
+0.20 \sim 0.35
+$$
+
+步长为：
+
+$$
+0.02
+$$
+
+### 4.3 评估目标
+
+当前在线自适应并不是直接最大化融合结果自身的绝对 `f1`，而是最大化相对最佳单传感器的收益：
+
+$$
+utility = gain\_f1 + 0.35 \cdot gain\_recall
 $$
 
 其中：
 
-- $r$ 为体素中心到当前无人机位置的距离；
-- $\lambda_d$ 对应 `depth_decay`；
-- $r_n$ 对应 `near_field_radius`。
-
-对 LiDAR 点云，采用如下中远场增强模型，见 [ros2_lidar_depth_fusion_node.py:178](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:178) 到 [ros2_lidar_depth_fusion_node.py:182](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:182)：
-
 $$
-p_l(r) = \mathrm{clip}\left(0.35 + 0.45 \left(1 - e^{-r / \lambda_l}\right) + \mathbb{I}(r > r_n)\cdot 0.10 \right),
+gain\_f1 = fusion\_f1 - best\_single\_f1
 $$
 
-其中 $\lambda_l$ 对应 `lidar_growth`。
-
-该设计体现了工程上的直观假设：近场结构更信任深度相机，远场稀疏几何更信任 LiDAR。
-
-从方法本质上看，这一步决定了当前融合算法区别于“等权融合”的关键特征。若对两类传感器赋予完全相同的证据强度，则无法反映深度相机在近场密集观测中的优势，也无法体现 LiDAR 在中远场测距稳定性上的优势。当前工程所采用的距离自适应策略，本质上是在不引入复杂学习模型的前提下，将传感器物理特性直接编码进融合权重函数之中。
-
-### 3.5 体素证据融合
-
-预处理后，点云按照体素分辨率进行量化，见 [ros2_lidar_depth_fusion_node.py:192](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:192) 到 [ros2_lidar_depth_fusion_node.py:205](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:205)。对于每个体素，先统计命中次数 $n_k$，再构造命中增强项：
-
 $$
-w_k = \min(\log(1+n_k), 1.6).
+gain\_recall = fusion\_recall - best\_single\_recall
 $$
 
-接着把概率映射为 log-odds 形式：
+这样做的含义是：
+
+- 若融合没有真正优于最佳单传感器，则不会因为点更多而被误判为更好；
+- 在线阈值调节的目标被明确限制为“创造真实融合收益”。
+
+### 4.4 平滑策略
+
+为抑制单帧波动，系统对候选阈值的 utility 做指数滑动平均：
 
 $$
-\ell_k = \log \frac{p_k}{1-p_k},
+S_t = (1-\alpha)S_{t-1} + \alpha U_t
 $$
 
-并得到该模态对体素的证据贡献：
+其中 $\alpha$ 对应：
 
-$$
-\Delta L_k = w_k \cdot \ell_k.
-$$
+- `adaptive_score_alpha`
 
-深度与 LiDAR 的证据在同一体素内累加为：
+它不是被在线调节的对象，而是自适应过程的稳定性超参数。
 
-$$
-L_k = \sum \Delta L_k^{(d)} + \sum \Delta L_k^{(l)}.
-$$
+## 5. 目前到底有几个“自适应参数”
 
-最终利用 sigmoid 函数恢复为占据概率：
+从严格工程定义看，当前真正在线自适应的参数只有 1 个：
 
-$$
-P_k = \sigma(L_k)=\frac{1}{1+e^{-L_k}}.
-$$
+- `min_probability`
 
-若满足
+其余 `adaptive_*` 参数大多属于以下两类：
 
-$$
-P_k \ge P_{\min}, \quad n_k \ge n_{\min},
-$$
+1. 开关与边界控制
+   - `adaptive_min_probability_enable`
+   - `adaptive_min_probability_min`
+   - `adaptive_min_probability_max`
+   - `adaptive_min_probability_step`
 
-则该体素被保留为融合障碍体素，见 [ros2_lidar_depth_fusion_node.py:226](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:226) 到 [ros2_lidar_depth_fusion_node.py:251](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py:251)。
+2. 评估与平滑超参数
+   - `adaptive_eval_range`
+   - `adaptive_min_gt_voxels`
+   - `adaptive_score_alpha`
 
-因此，当前方法本质上是一种“距离自适应的体素级概率占据证据融合”，可视为 OctoMap 风格 log-odds 思路在双模态局部障碍感知中的工程化实现。
+此外，代码中虽然声明了：
 
-进一步地，可以将当前融合算法概括为如下三条核心原则：
+- `adaptive_target_retention`
+- `adaptive_retention_band`
 
-1. 统一空间表达：所有观测首先投影到相同体素网格中，避免直接在原始点级别做不稳定的数据拼接。
-2. 区分传感器优势：通过距离自适应概率函数，让深度相机主导近场，让 LiDAR 主导中远场。
-3. 以占据证据为融合对象：输出的不是“原始点并集”，而是经过概率判别后的高置信障碍体素集合。
+但当前版本它们并未进入实际在线决策逻辑，因此不能算当前真正生效的自适应参数。
 
-这意味着当前算法的最终输出更适合作为 EGO-Planner 的 `grid_map/cloud` 输入，因为它直接对应规划所需的局部障碍占据表达，而不是视觉重建意义上的稠密场景模型。
+## 6. 工程验证链路
 
-### 3.6 当前融合算法的重点概括
+### 6.1 RViz 演示链路
 
-为了便于在论文中快速说明，当前融合算法可以概括为：
+当前项目已经新增：
 
-“一种基于 log-odds 的深度自适应双模态体素占据融合方法。”
+- `drone0_clean.rviz`
+- `tools/run_adaptive_rviz_demo.sh`
 
-其要点包括：
+这样做的原因是：旧的 `default.rviz` 混入了大量多机历史显示项，容易在单机仿真下造成误判。新的干净 RViz 配置只保留当前 `drone_0` 相关显示，从而更适合验证当前演示链路是否真的在运动与避障。
 
-- 融合对象是“障碍占据证据”，不是原始点云坐标本身。
-- 融合层级是“体素层”，不是像素层，也不是轨迹层。
-- 权重依据是“距离”，不是人工固定常数。
-- 输出目标是“供局部规划直接使用的融合障碍点云”。
+### 6.2 Headless 指标链路
 
-若进一步压缩为一句工程化表述，则可写为：
+当前项目的 headless 评测由以下脚本组成：
 
-“该方法通过对深度点云和 LiDAR 点云在统一体素网格中进行距离自适应的概率证据累积，生成高置信障碍体素集合，从而提升 EGO-Planner 局部地图输入的完整性与鲁棒性。”
+- `tools/compare_fusion.sh`
+- `fusion_benefit_report.py`
+- `sim_flight_stats_report.py`
 
-## 4. 仿真 LiDAR 的构造与意义
+当前版本已修复：
 
-为了在当前仿真环境中得到与真实 LiDAR 类似的几何观测，系统额外实现了 [simulated_lidar_cloud.py](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/simulated_lidar_cloud.py)。该节点从全局障碍云中，根据无人机当前位置和航向，模拟 LiDAR 的：
+- 重复 `rclpy.shutdown()` 导致的统计脚本异常退出
+- `replan_count` 基线错误和提前收尾问题
 
-- 最大量程约束；
-- 水平视场裁剪；
-- 垂直视场裁剪；
-- 随机稀疏采样；
-- 体素级去重。
+因此，当前文档中引用的融合收益与重规划统计，已经有更稳定的工程采集链路支撑。
 
-其关键实现位于 [simulated_lidar_cloud.py:95](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/simulated_lidar_cloud.py:95) 到 [simulated_lidar_cloud.py:143](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/simulated_lidar_cloud.py:143)。该节点的存在使得当前多模态融合方案在不改变规划框架的前提下，能够形成“深度相机 + LiDAR”的双几何传感器输入。
+## 7. 当前数据结论
 
-## 5. 与 EGO-Planner 的接口关系
+根据当前项目中已经验证过的结果，可以得到以下结论：
 
-融合节点输出的话题为 `/drone_0_fusion/fused_cloud`，对应 `world` 坐标系，见 [single_run_in_sim_fusion.launch.py:183](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:183) 到 [single_run_in_sim_fusion.launch.py:184](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py:184)。在规划器启动配置中，该融合输出被接到 `grid_map/cloud`，见 [advanced_param.launch.py:108](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/advanced_param.launch.py:108) 到 [advanced_param.launch.py:109](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/launch/advanced_param.launch.py:109)。
+1. 固定高阈值 `min_probability=0.55` 时，融合收益很差，甚至相对最佳单传感器为负增益。
+2. 将阈值降低到 `0.40` 后，融合开始出现正收益，但提升有限。
+3. 将在线自适应限制在 `0.20 ~ 0.35` 低阈值区间内时，融合表现更稳定，且对 Recall 与 F1 都能持续带来正收益。
 
-因此，融合模块与 EGO-Planner 的关系不是“直接修改轨迹优化器”，而是“提高局部占据输入质量”。从系统职责上看，这是一种感知层增强而非规划层重构。
+因此，从当前工程结果看，第一阶段把自适应集中在融合层 `min_probability` 是合理的。
 
-## 6. 实验设置与结果
+## 8. 讨论
 
-### 6.1 实验设置
+### 8.1 当前方案的优势
 
-当前实验基于工程内仿真结果文件：
+- 不需要改写 EGO-Planner 主体优化器
+- 接口保持为标准 `PointCloud2`
+- 在线自适应对象单一，便于排查与解释
+- 既能在 RViz 演示，也能做 headless 批量评测
 
-- 融合收益统计：[fusion_benefit_summary.json](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/artifacts/fusion_metrics/plots/fusion_benefit_summary.json)
-- 环境统计：[sim_stats_summary.json](/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/artifacts/sim_stats/sim_stats_summary.json)
+### 8.2 当前方案的局限
 
-环境障碍规模统计如下：
+- 真实在线自适应参数目前只有 1 个，覆盖面还不大
+- `adaptive_target_retention` 等设计意图尚未真正落地
+- 当前仍以几何感知质量为主，尚未把自适应扩展到规划权重层
+- 仿真中使用 `force_zero_stamp` 以适配当前数据路径，这属于工程性同步修补，不等价于真机时钟同步
 
-- 全局障碍点数：152503
-- 全局障碍体素数：37881
-- 障碍簇估计数：157
-- 局部膨胀占据图峰值点数：31547
+## 9. 结论
 
-### 6.2 融合收益
+基于当前项目代码可以明确得出：现阶段的多模态融合增强，本质上是“体素级几何占据证据融合 + 单参数在线阈值自适应”。  
+当前真正在线自适应的参数只有一个，即融合层障碍接受阈值 `min_probability`。其他 `adaptive_*` 参数要么用于定义搜索边界，要么用于控制平滑和评估范围，并不构成独立的在线自适应对象。
 
-在 72 帧融合评估窗口内，当前方法取得如下平均结果：
-
-| 指标 | Depth | LiDAR | Fusion |
-|---|---:|---:|---:|
-| Recall | 0.1108 | 0.1371 | 0.1942 |
-| F1 | 0.1994 | 0.2412 | 0.3253 |
-
-相对于最佳单模态，融合结果的提升为：
-
-- 平均 Recall 增益：`+0.0571`
-- 平均 F1 增益：`+0.0841`
-- Recall 正增益比例：`100%`
-- F1 正增益比例：`100%`
-
-这说明当前距离自适应证据融合方法在当前仿真设置下，不仅优于单独深度相机，也优于单独 LiDAR，并且这种优势具有稳定性，而非偶然出现在少数帧中。
-
-### 6.3 结果分析
-
-从结果上看，深度点云在近场密集结构表达方面仍有价值，但其单独使用时 Recall 和 F1 均明显低于融合结果；LiDAR 作为单模态时表现优于深度点云，但融合结果依然进一步提升，表明两种传感器在体素层面具有互补性。
-
-需要指出的是，当前收益主要体现在局部障碍观测完整性上，而不是直接体现在轨迹性能指标上。换言之，本文方法首先改善的是“地图输入质量”，进而为后续规划性能提升创造条件。
-
-## 7. 讨论
-
-### 7.1 当前方法的优点
-
-当前方法具有以下工程优势：
-
-- 实现轻量，能够直接运行在现有 ROS2 EGO-Planner 工程中；
-- 不依赖深度学习模型或额外训练数据；
-- 输出保持为标准 `PointCloud2`，便于与现有 `grid_map/cloud` 接口兼容；
-- 参数含义清晰，便于按近场、远场和噪声水平进行调节。
-
-### 7.2 当前方法的局限性
-
-该方法仍存在以下局限：
-
-- 当前仿真默认两路点云均在 `world` 坐标系下，未体现真实系统中的外参与时延误差；
-- 融合策略只使用几何信息，未引入语义可信度；
-- 融合结果本质上仍是占据点云，尚未扩展为更丰富的置信地图或 ESDF 置信权重；
-- 当前统计结果主要验证感知质量增益，尚未系统量化轨迹平滑性、最小安全距离与任务完成时间。
-
-## 8. 结论
-
-本文围绕当前 ROS2 EGO-Planner 工程，介绍并总结了一种已实际接入仿真链路的多模态融合方法。该方法采用近似时间同步、统一坐标系下的点云预处理，以及基于 log-odds 的距离自适应体素证据融合，将深度相机与 LiDAR 的优势结合为单一融合障碍点云，再输入 EGO-Planner 的局部地图模块。
-
-现有实验结果表明，该方法在当前工程环境中可稳定提高障碍感知的 Recall 和 F1 指标，并具有明确的工程可扩展性。对于后续工作，可进一步引入真实 TF 外参、时间延迟补偿、C++ 高性能实现，以及语义信息与 ESDF 置信建模，从而提升该方法在真实无人机平台中的实用价值。
+从工程角度看，这种设计是合理的第一步：它既能显式提升融合输入质量，又不会把问题扩散到规划层和控制层，从而保留了系统调试与结果解释的可控性。

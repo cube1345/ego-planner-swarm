@@ -11,7 +11,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'rviz_config',
-            default_value='default.rviz',
+            default_value='drone0_clean.rviz',
             description='RViz config file located in ego_planner/launch',
         ),
         Node(

@@ -246,7 +246,7 @@ def generate_launch_description():
         DeclareLaunchArgument('fusion_python_executable', default_value='/usr/bin/python3'),
         DeclareLaunchArgument('use_fusion', default_value='True'),
         DeclareLaunchArgument('min_probability', default_value='0.30'),
-        DeclareLaunchArgument('adaptive_min_probability_enable', default_value='False'),
+        DeclareLaunchArgument('adaptive_min_probability_enable', default_value='True'),
         DeclareLaunchArgument('adaptive_min_probability_min', default_value='0.20'),
         DeclareLaunchArgument('adaptive_min_probability_max', default_value='0.35'),
         DeclareLaunchArgument('adaptive_min_probability_step', default_value='0.02'),

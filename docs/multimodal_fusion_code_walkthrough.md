@@ -1,163 +1,282 @@
-# EGO-Planner 多模态融合代码说明（ROS2）
+# EGO-Planner 多模态融合代码说明（ROS 2）
 
-更新时间：2026-03-31
+更新时间：2026-05-03
 
-## 1. 先看结论：当前仓库“融合”是怎么接上的
+## 1. 当前仓库里的融合链路是什么
 
-当前仿真链路里，多模态融合是通过一个 Python 节点实现的：
+当前仿真中的多模态融合是一个几何层融合链路，不是状态估计融合，也不是规划权重融合。
+
+输入：
 
 - 深度点云：`/drone_0_pcl_render_node/cloud`
 - 模拟 LiDAR 点云：`/drone_0_lidar/points`
-- 融合输出：`/drone_0_fusion/fused_cloud`
-- 规划器输入重映射到：`grid_map/cloud`
 
-关键代码入口在：
+输出：
 
+- 融合点云：`/drone_0_fusion/fused_cloud`
+
+规划器最终订阅：
+
+- `grid_map/cloud`
+
+在融合启动文件里，`grid_map/cloud` 被重映射到 `/drone_0_fusion/fused_cloud`。
+
+关键文件：
 
 - `src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py`
 - `src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py`
+- `src/planner/plan_manage/scripts/simulated_lidar_cloud.py`
 - `src/planner/plan_manage/launch/advanced_param.launch.py`
 
-## 2. 数据流（Data Flow）
+## 2. 数据流
 
 ```text
-map_generator/global_cloud
-          |
-          v
-simulated_lidar_cloud.py --------------------> /drone_0_lidar/points
-                                               (LiDAR)
-pcl_render_node/cloud -----------------------> /drone_0_pcl_render_node/cloud
-                                               (Depth cloud)
+/map_generator/global_cloud
+        |
+        v
+simulated_lidar_cloud.py ----------> /drone_0_lidar/points
+                                     (simulated lidar)
 
-                      +------------------------------+
-                      | ros2_lidar_depth_fusion_node |
-                      |  - ApproximateTime sync      |
-                      |  - filter(z/range)           |
-                      |  - voxel evidence fusion     |
-                      +---------------+--------------+
-                                      |
-                                      v
-                         /drone_0_fusion/fused_cloud
-                                      |
-                                      v
-                    advanced_param.launch.py: grid_map/cloud
-                                      |
-                                      v
-                             EGO-Planner grid_map
+/drone_0_pcl_render_node/cloud ----> /drone_0_pcl_render_node/cloud
+                                     (depth cloud)
+
+                  +-----------------------------------+
+                  | ros2_lidar_depth_fusion_node.py   |
+                  | - ApproximateTime sync            |
+                  | - z/range filter                  |
+                  | - voxel evidence fusion           |
+                  | - adaptive min_probability        |
+                  +----------------+------------------+
+                                   |
+                                   v
+                     /drone_0_fusion/fused_cloud
+                                   |
+                                   v
+                  advanced_param.launch.py -> grid_map/cloud
+                                   |
+                                   v
+                            EGO-Planner grid_map
 ```
 
-## 3. 代码级拆解
+## 3. 启动层怎么把融合接进去
 
-### 3.1 启动文件如何切换到融合点云
+### 3.1 融合启动文件
 
-文件：`src/planner/plan_manage/launch/single_run_in_sim_fusion.launch.py`
+`single_run_in_sim_fusion.launch.py` 做了四件事：
 
-1. `use_fusion` 决定规划器吃哪路点云。
-   - 第 32 行：`cloud_topic = 'fusion/fused_cloud' if use_fusion_value else 'pcl_render_node/cloud'`
-2. 这个 `cloud_topic` 传到 planner 参数启动文件。
-   - 第 84-95 行：`advanced_param_include` 把 `cloud_topic` 继续下传。
-3. 启动模拟 LiDAR。
-   - 第 151-173 行：`simulated_lidar_cloud.py`
-4. 启动融合节点进程。
-   - 第 175-191 行：`ExecuteProcess` 拉起 `ros2_lidar_depth_fusion_node.py`
+1. 启动地图和原始仿真传感器
+2. 启动模拟 LiDAR 节点
+3. 启动融合节点
+4. 把 planner 的 `grid_map/cloud` 改接融合点云
 
-### 3.2 规划器最终从哪里接收融合结果
+当前这个启动文件还负责把自适应阈值参数传给融合节点，包括：
 
-文件：`src/planner/plan_manage/launch/advanced_param.launch.py`
+- `min_probability`
+- `adaptive_min_probability_enable`
+- `adaptive_min_probability_min`
+- `adaptive_min_probability_max`
+- `adaptive_min_probability_step`
+- `adaptive_eval_range`
+- `adaptive_min_gt_voxels`
+- `adaptive_score_alpha`
 
-- 第 109 行：`('grid_map/cloud', ['drone_', drone_id, '_', cloud_topic])`
+### 3.2 非融合原版链路
 
-当 `cloud_topic=fusion/fused_cloud` 时，EGO-Planner 的 `grid_map/cloud` 实际订阅：
+`single_run_in_sim.launch.py` 不启动模拟 LiDAR，也不启动融合节点。  
+它让 planner 直接读取 `pcl_render_node/cloud`。
 
-- `/drone_<id>_fusion/fused_cloud`
+这也是为什么原版链路更简单、更容易排查。
 
-这就是融合结果进入局部占据地图（occupancy / inflate）的入口。
+## 4. 融合节点内部逻辑
 
-### 3.3 融合节点核心逻辑（逐函数）
+### 4.1 预处理
 
-文件：`src/planner/plan_manage/scripts/ros2_lidar_depth_fusion_node.py`
+融合节点先对两路点云做：
 
-1. 参数与运行阈值（第 57-73 行）
+- 非有限值剔除
+- 高度裁剪：`z_min ~ z_max`
+- 距离裁剪：`max_range`
 
-   - 输入 topic、输出 topic、体素分辨率、z 高度裁剪、最大范围、同步窗口、概率阈值等。
-2. 时间同步（第 100-108 行）
+对应函数：
 
-   - `message_filters.ApproximateTimeSynchronizer`
-   - `queue_size=sync_queue`，`slop=sync_slop`
-   - 融合回调入口：`sync_callback`
-3. 同步回调（第 124-147 行）
+- `cloud_to_xyz()`
+- `filter_points()`
 
-   - 点云解码：`cloud_to_xyz()`（第 149-156 行）
-   - 基础过滤：`filter_points()`（第 158-170 行）
-   - 融合主流程：`fuse_clouds()`（第 216-251 行）
-   - 发布输出：`xyz_to_cloud()`（第 253-257 行）
-   - 调试统计输出：`depth_only / lidar_only / dual`
-4. 证据融合策略（第 172-251 行）
+### 4.2 距离自适应证据模型
 
-   - 深度概率模型：`depth_probability()`（近场权重大）
-   - LiDAR 概率模型：`lidar_probability()`（中远场权重大）
-   - `accumulate_voxels()` 把两路点投到同一体素格，累加 log-odds 证据
-   - `fuse_clouds()` 按 `min_probability`、`min_hits` 进行体素保留判定
+当前算法不是简单拼接点云，而是把两类点映射成“占据证据”。
 
-> 当前版本是“体素证据级融合”，不是直接拼接两路点云。
+设计原则：
 
-### 3.4 为什么加 `force_zero_stamp`
+- 近场更信任 depth
+- 中远场更信任 lidar
 
-文件：`src/planner/plan_manage/scripts/simulated_lidar_cloud.py`
+对应函数：
 
-- 第 33 行：增加参数 `force_zero_stamp`
-- 第 145-156 行：发布时若开启则强制时间戳为 0
+- `depth_probability()`
+- `lidar_probability()`
 
-对应启动文件：
+### 4.3 体素级证据融合
 
-- `single_run_in_sim_fusion.launch.py` 第 170 行：`force_zero_stamp=True`
+融合核心是：
 
-原因：当前仿真路径下 depth 云时间戳为 0，若 LiDAR 用真实时钟，`ApproximateTimeSynchronizer` 很难配对，融合回调触发频率会明显下降。
+- 把两路点投影到统一体素网格
+- 以体素为单位积累 depth 与 lidar 的 log-odds 证据
+- 计算每个体素的最终占据概率
+- 用 `min_probability` 和 `min_hits` 决定体素是否保留
 
-## 4. 当前版本“坐标变换”现状
+对应函数：
 
-当前仿真里两路点云都在 `world` 下发布（launch 第 160 行 `frame_id=world`，融合输出第 184 行 `output_frame=world`），因此没有单独 TF 外参求解流程。
+- `accumulate_voxels()`
+- `build_fusion_state()`
+- `select_fused_points()`
 
-这意味着：
+所以当前方法本质上是：
 
-- 仿真可跑通；
-- 真机接入时必须补齐 `camera_frame -> body -> lidar_frame -> world` 的 TF 变换与时间对齐。
+“体素级、概率证据式、距离自适应的几何融合”
 
-## 5. 真机接入时建议改动点（TODO）
+不是：
 
-1. 在融合节点增加 TF2 变换层
+- 原始点云并集
+- 图像层融合
+- 学习式语义融合
 
-   - 在 `sync_callback()` 内，对两路点云先做 `doTransform` 到统一坐标系再 `filter_points()`/`fuse_clouds()`。
-   - TODO：标定并固化 `T_body_camera`、`T_body_lidar`。
-2. 将“仿真时间戳 hack”替换为真实时间同步
+## 5. 当前在线自适应参数到底有几个
 
-   - 关闭 `force_zero_stamp`；
-   - 使用硬件时间戳 + 触发同步（或更小 `sync_slop` + 延迟补偿）。
-3. 若转为 C++ 高性能实现
+当前真正在线自适应的参数只有一个：
 
-   - 保持 topic 契约不变（输入两路云 + 里程计，输出 `/fusion_cloud`）；
-   - 用 PCL + `pcl::VoxelGrid` + `tf2_ros::Buffer` 复现同样模块边界，避免影响上层 planner。
+- `current_min_probability`
 
-## 6. 如何确认“确实在做多模态融合”
+它的静态基准值来自：
 
-1. 看融合节点日志（`publish_debug_stats_every`）
+- `min_probability`
 
-   - 持续出现 `dual > 0`，表示同一帧体素同时被 depth 和 lidar 观测到。
-2. 看话题链路
+它的候选搜索空间由以下参数控制：
 
-   - `ros2 topic echo --once /drone_0_fusion/fused_cloud --field width`
-   - `ros2 topic echo --once /drone_0_grid/grid_map/occupancy_inflate --field width`
-3. RViz 同时显示三路点云
+- `adaptive_min_probability_min`
+- `adaptive_min_probability_max`
+- `adaptive_min_probability_step`
 
-   - 深度：`/drone_0_pcl_render_node/cloud`
-   - LiDAR：`/drone_0_lidar/points`
-   - 融合：`/drone_0_fusion/fused_cloud`
+### 5.1 自适应流程
 
-## 7. 关键调参建议（先保证可飞再提性能）
+每次同步回调内都会调用：
 
-- 同步：`sync_slop`（第 72/105 行），先保证回调稳定触发。
-- 过滤：`z_min/z_max/max_range`（第 63-66 行），减少离群点。
-- 融合偏好：`near_field_radius/depth_decay/lidar_growth`（第 66-68 行）。
-- 占据判定：`min_probability/min_hits`（第 69-70 行），控制漏检与误检平衡。
+- `auto_tune_min_probability()`
 
-建议流程：先固定 `resolution` 与同步，再调概率模型，最后调 `min_probability`。
+流程如下：
+
+1. 从 `/map_generator/global_cloud` 里取无人机附近的局部 GT 体素
+2. 计算当前 depth-only 和 lidar-only 的局部指标
+3. 在候选阈值区间内枚举多个 `min_probability`
+4. 对每个候选阈值生成一份预测障碍集合
+5. 计算候选阈值相对最佳单传感器的收益：
+   - `gain_recall`
+   - `gain_f1`
+6. 定义目标函数：
+   - `utility = gain_f1 + 0.35 * gain_recall`
+7. 对每个候选 utility 做 EMA 平滑
+8. 取最高分阈值作为当前帧 `current_min_probability`
+
+### 5.2 哪些参数只是“控制自适应过程”
+
+以下参数不是被在线调整的对象，而是控制在线调节过程的超参数：
+
+- `adaptive_min_probability_enable`
+- `adaptive_eval_range`
+- `adaptive_min_gt_voxels`
+- `adaptive_score_alpha`
+
+### 5.3 当前未真正用上的参数
+
+代码里还声明了：
+
+- `adaptive_target_retention`
+- `adaptive_retention_band`
+
+但当前版本它们没有进入 `auto_tune_min_probability()` 的实际决策路径。  
+也就是说，现阶段真正生效的自适应方向仍然只有一个：
+
+- 融合层障碍接受阈值 `min_probability`
+
+## 6. 为什么要有 `force_zero_stamp`
+
+当前仿真链路中，`pcl_render_node/cloud` 的时间戳是零。  
+如果模拟 LiDAR 正常使用当前时钟，`ApproximateTimeSynchronizer` 很难稳定把两路数据配上。
+
+所以 `simulated_lidar_cloud.py` 里引入了：
+
+- `force_zero_stamp`
+
+并且在融合仿真启动时默认设成：
+
+- `True`
+
+这样做的目的不是“更真实”，而是保证当前仿真路径里同步回调稳定触发。
+
+## 7. RViz 链路为什么后来要改
+
+之前的 `default.rviz` 混了很多 `drone_1 ~ drone_20` 的历史显示项，  
+即使当前只跑一架 `drone_0`，也容易出现：
+
+- 视觉混乱
+- 看错机器人
+- 误判无人机没动
+
+所以当前项目新增并推荐：
+
+- `src/planner/plan_manage/launch/drone0_clean.rviz`
+
+同时 `rviz.launch.py` 的默认配置也已经切换到这份干净单机视图。
+
+## 8. 当前工程层面的可靠启动方式
+
+为了避免旧进程残留导致两套 `/drone_0` 仿真互相串话，当前新增了：
+
+- `tools/run_adaptive_rviz_demo.sh`
+
+它会先清掉旧的：
+
+- `single_run_in_sim_fusion.launch.py`
+- `single_run_in_sim.launch.py`
+- `ego_planner_node`
+- `traj_server`
+- `rviz2`
+
+然后只启动一套干净的自适应融合仿真，再打开 `drone0_clean.rviz`。
+
+## 9. Headless 评测链路
+
+当前 headless 评测由：
+
+- `tools/compare_fusion.sh`
+- `src/planner/plan_manage/scripts/fusion_benefit_report.py`
+- `tools/sim_flight_stats_report.py`
+
+共同构成。
+
+已修复的问题：
+
+- `fusion_benefit_report.py` 重复 `rclpy.shutdown()` 报错
+- `sim_flight_stats_report.py` 的 `replan_count` 错误基线和提前收尾问题
+
+当前 `replan_count` 的统计依据是最终的：
+
+- `launch.log`
+
+而不是不稳定的 ROS 内部日志文件。
+
+## 10. 结论
+
+从代码结构看，当前仓库里的“多模态融合”是：
+
+- 几何层融合
+- 体素证据融合
+- 单参数在线自适应
+
+它增强的是 planner 的局部地图输入质量，而不是直接改 planner 优化器本身。
+
+当前真正在线自适应的参数只有一个：
+
+- `min_probability`
+
+这也是当前文档、仿真链路和 headless 评测里都应统一遵守的工程事实。

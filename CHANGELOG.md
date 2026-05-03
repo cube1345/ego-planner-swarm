@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-05-03
+
+### Simulation And RViz
+
+- Added `src/planner/plan_manage/launch/drone0_clean.rviz` as the clean single-drone RViz view.
+- Changed `src/planner/plan_manage/launch/rviz.launch.py` default config from `default.rviz` to `drone0_clean.rviz`.
+- Added `tools/run_adaptive_rviz_demo.sh` to clear stale ROS / RViz processes before launching one clean adaptive fusion demo.
+- Documented the operational difference between the original non-fusion chain and the adaptive fusion chain.
+
+### Headless Metrics
+
+- Fixed duplicate shutdown handling in `src/planner/plan_manage/scripts/fusion_benefit_report.py`.
+- Fixed `tools/sim_flight_stats_report.py` so `replan_count` is counted from the final batch `launch.log`.
+- Changed `tools/sim_flight_stats_report.py` to finish on external stop rather than timing out early, preventing tail-end replans from being dropped.
+- Changed `tools/compare_fusion.sh` stop order to stop launch first, then stats, then report, so final counts match the completed run.
+
+### Documentation Refresh
+
+- Rewrote `Readme.md` to match the current project structure and launch recommendations.
+- Updated `docs/latest_operation_guide.md` to use the clean RViz path and the adaptive fusion demo script.
+- Updated `docs/multimodal_fusion_code_walkthrough.md` to reflect the current code path and the actual active adaptive-parameter logic.
+- Updated `docs/multimodal_fusion_paper_style.md` to align the paper-style description with the current engineering implementation.
+
+### Adaptive Parameter Status
+
+- Clarified that the current project has only one truly online adaptive parameter: fusion-layer `min_probability`.
+- Clarified that `adaptive_min_probability_min/max/step`, `adaptive_eval_range`, `adaptive_min_gt_voxels`, and `adaptive_score_alpha` are controller hyperparameters for the adaptation process rather than independently adapted runtime parameters.
+- Clarified that `adaptive_target_retention` and `adaptive_retention_band` are declared but are not part of the current online decision logic.
+
 ## 2026-04-12
 
 ### Multimodal Fusion
