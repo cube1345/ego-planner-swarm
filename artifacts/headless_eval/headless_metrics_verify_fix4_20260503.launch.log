@@ -1,0 +1,1262 @@
+[INFO] [launch]: All log files can be found below artifacts/headless_eval/headless_metrics_verify_fix4_20260503_ros_logs/2026-05-03-12-10-39-324702-Cubot-238506
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [random_forest-1]: process started with pid [238508]
+[INFO] [ego_planner_node-2]: process started with pid [238510]
+[INFO] [traj_server-3]: process started with pid [238512]
+[INFO] [simulated_lidar_cloud.py-4]: process started with pid [238514]
+[INFO] [python3-5]: process started with pid [238516]
+[INFO] [poscmd_2_odom-6]: process started with pid [238518]
+[INFO] [odom_visualization-7]: process started with pid [238520]
+[INFO] [pcl_render_node-8]: process started with pid [238522]
+[ego_planner_node-2] hit: 0.619039
+[ego_planner_node-2] miss: -0.619039
+[ego_planner_node-2] min log: -1.99243
+[ego_planner_node-2] max: 2.19722
+[ego_planner_node-2] thresh log: 1.38629
+[ego_planner_node-2] [INFO] [1777781439.546144838] [drone_0_ego_planner_node]: Wait for 1 second.
+[ego_planner_node-2] [FSM]: from INIT to WAIT_TARGET
+[simulated_lidar_cloud.py-4] [INFO] [1777781439.688097007] [drone_0_simulated_lidar]: simulated lidar ready. global=/map_generator/global_cloud odom=/drone_0_visual_slam/odom out=/drone_0_lidar/points
+[python3-5] [INFO] [1777781439.732743279] [lidar_depth_fusion_node]: Fusion node ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points out=/drone_0_fusion/fused_cloud frame=world
+[random_forest-1] seed=1
+[random_forest-1] [WARN] [1777781439.912159439] [RandomMapGenerateCylinder]: Finished generate random map 
+[pcl_render_node-8] [WARN] [1777781439.969290889] [rcvGlobalPointCloudCallBack]: Global Pointcloud received..
+[traj_server-3] [WARN] [1777781440.405722689] [drone_0_traj_server]: [Traj server]: ready.
+[ego_planner_node-2] [FSM]: state: WAIT_TARGET
+[ego_planner_node-2] wait for goal or trigger.
+[ego_planner_node-2] [WARN] [1777781440.714240311] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[ego_planner_node-2] [TRIG]: from WAIT_TARGET to GEN_NEW_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 0]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=31,time(ms)=0.077,total_t(ms)=0.077,cost=0.261
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.000211146[0m,optimize:0.000209665,refine:1.481e-06,avg_time=0.000211146
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from GEN_NEW_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 1]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=12,time(ms)=0.043,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.028,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.18,rebound.
+[ego_planner_node-2] [32miter(+1)=16,time(ms)=0.030, collided, keep optimizing
+[ego_planner_node-2] [0miter=17,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.18,rebound.
+[ego_planner_node-2] [32miter(+1)=28,time(ms)=0.064, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=26,time(ms)=0.060, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=11,time(ms)=0.048,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.062,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.022, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=13,time(ms)=0.022,total_t(ms)=0.189,cost=2.749
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] iter=14,time(ms)=0.034,rebound.
+[ego_planner_node-2] iter=29,time(ms)=0.066,rebound.
+[ego_planner_node-2] [32miter(+1)=21,time(ms)=0.040, collided, keep optimizing
+[ego_planner_node-2] [0miter=16,time(ms)=0.04,rebound.
+[ego_planner_node-2] [32miter(+1)=14,time(ms)=0.024, collided, keep optimizing
+[ego_planner_node-2] [0miter=16,time(ms)=0.052,rebound.
+[ego_planner_node-2] iter=27,time(ms)=0.076,rebound.
+[ego_planner_node-2] [32miter(+1)=15,time(ms)=0.029,total_t(ms)=0.390,cost=1.566
+[ego_planner_node-2] [0mtraj 3 success.
+[ego_planner_node-2] iter=15,time(ms)=0.031,rebound.
+[ego_planner_node-2] iter=26,time(ms)=0.059,rebound.
+[ego_planner_node-2] [32miter(+1)=14,time(ms)=0.022,total_t(ms)=0.114,cost=0.339
+[ego_planner_node-2] [0mtraj 4 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0019[0m,optimize:0.0019,refine:1.5e-06,avg_time=0.0011
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 2]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.034,total_t(ms)=0.034,cost=0.102
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00013[0m,optimize:0.00013,refine:1.3e-06,avg_time=0.00075
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 3]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.042,rebound.
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.057,total_t(ms)=0.111,cost=0.118
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00023[0m,optimize:0.00023,refine:2.2e-06,avg_time=0.00062
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 4]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=12,time(ms)=0.025, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.003, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.003, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 5]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.025,rebound.
+[ego_planner_node-2] iter=5,time(ms)=1.4,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.058,rebound.
+[ego_planner_node-2] iter=27,time(ms)=0.064,rebound.
+[ego_planner_node-2] [32miter(+1)=15,time(ms)=0.022, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=17,time(ms)=0.027, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=35,time(ms)=0.064, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=9,time(ms)=0.021,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.030, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=44,time(ms)=0.076, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=29,time(ms)=0.050, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] iter=10,time(ms)=0.02,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.012, collided, keep optimizing
+[ego_planner_node-2] [0miter=7,time(ms)=0.14,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.22,rebound.
+[ego_planner_node-2] iter=29,time(ms)=0.059,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.049, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=16,time(ms)=0.025, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 3 failed.
+[ego_planner_node-2] iter=6,time(ms)=0.015,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.015,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.012, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=19,time(ms)=0.029, collided, keep optimizing
+[ego_planner_node-2] [0miter=39,time(ms)=0.079,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.2,rebound.
+[ego_planner_node-2] [32miter(+1)=23,time(ms)=0.044, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 4 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 6]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=1,time(ms)=0.004, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.003, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.003, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 7]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=11,time(ms)=0.019,total_t(ms)=0.019,cost=0.073
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m9.3e-05[0m,optimize:9.1e-05,refine:2e-06,avg_time=0.00052
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 8]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=12,time(ms)=0.037, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.005, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.005, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 9]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.036,rebound.
+[ego_planner_node-2] iter=5,time(ms)=2.2,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.14,rebound.
+[ego_planner_node-2] [32miter(+1)=26,time(ms)=0.074, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=14,time(ms)=0.037, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=15,time(ms)=0.039, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=9,time(ms)=0.032,rebound.
+[ego_planner_node-2] iter=28,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=27,time(ms)=0.079, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=24,time(ms)=0.068, collided, keep optimizing
+[ego_planner_node-2] [0miter=27,time(ms)=0.17,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.057, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] iter=9,time(ms)=0.032,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.028, collided, keep optimizing
+[ego_planner_node-2] [0miter=8,time(ms)=0.52,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.48,rebound.
+[ego_planner_node-2] iter=33,time(ms)=0.12,rebound.
+[ego_planner_node-2] [32miter(+1)=15,time(ms)=0.041, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=19,time(ms)=0.060, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 3 failed.
+[ego_planner_node-2] iter=6,time(ms)=0.028,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.028,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.023, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=19,time(ms)=0.054, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=27,time(ms)=0.095, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 4 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 10]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=1,time(ms)=0.007, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.005, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.004, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 11]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=11,time(ms)=0.033,total_t(ms)=0.034,cost=0.067
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00014[0m,optimize:0.00014,refine:2.3e-06,avg_time=0.00045
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [WARN] [1777781441.900966199] [drone_0_ego_planner_node]: current traj in collision, replan.
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 12]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=10,time(ms)=0.098,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.066,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.054,rebound.
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.064, collided, keep optimizing
+[ego_planner_node-2] [0miter=20,time(ms)=0.089,rebound.
+[ego_planner_node-2] iter=25,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=14,time(ms)=0.046,total_t(ms)=0.583,cost=10.062
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=12,time(ms)=0.044,rebound.
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.022,total_t(ms)=0.071,cost=0.283
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00081[0m,optimize:0.0008,refine:2.4e-06,avg_time=0.0005
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 13]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.053,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.034,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.025,total_t(ms)=0.135,cost=0.401
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00027[0m,optimize:0.00026,refine:2.4e-06,avg_time=0.00047
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 14]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.15,rebound.
+[ego_planner_node-2] [32miter(+1)=25,time(ms)=0.067, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=17,time(ms)=0.032, collided, keep optimizing
+[ego_planner_node-2] [0miter=23,time(ms)=0.058,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.024,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.19,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.055,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.028,rebound.
+[ego_planner_node-2] [32miter(+1)=22,time(ms)=0.052, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=5,time(ms)=0.098,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.023,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.019,rebound.
+[ego_planner_node-2] [32miter(+1)=24,time(ms)=0.046,total_t(ms)=0.190,cost=0.266
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0015[0m,optimize:0.0015,refine:1.6e-06,avg_time=0.00059
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 15]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=11,time(ms)=0.037,total_t(ms)=0.037,cost=0.046
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00019[0m,optimize:0.00019,refine:2.2e-06,avg_time=0.00055
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 16]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=11,time(ms)=0.052,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.038,rebound.
+[ego_planner_node-2] [32miter(+1)=42,time(ms)=0.179, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=15,time(ms)=0.050, collided, keep optimizing
+[ego_planner_node-2] [0miter=27,time(ms)=0.13,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.077,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.094,rebound.
+[ego_planner_node-2] [32miter(+1)=31,time(ms)=0.216, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=15,time(ms)=0.056,rebound.
+[ego_planner_node-2] [32miter(+1)=31,time(ms)=0.112, collided, keep optimizing
+[ego_planner_node-2] [0miter=12,time(ms)=0.049,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.121,total_t(ms)=0.366,cost=0.362
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0016[0m,optimize:0.0016,refine:2.5e-06,avg_time=0.00064
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 17]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.068,total_t(ms)=0.068,cost=0.032
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00021[0m,optimize:0.00021,refine:2.3e-06,avg_time=0.00061
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 18]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.14,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.062,rebound.
+[ego_planner_node-2] [32miter(+1)=34,time(ms)=0.147, collided, keep optimizing
+[ego_planner_node-2] [0miter=8,time(ms)=0.037,rebound.
+[ego_planner_node-2] iter=43,time(ms)=0.21,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.085,rebound.
+[ego_planner_node-2] [32miter(+1)=26,time(ms)=0.117, collided, keep optimizing
+[ego_planner_node-2] [0miter=5,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.055,rebound.
+[ego_planner_node-2] iter=38,time(ms)=0.21,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.068,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.051,total_t(ms)=1.500,cost=4.218
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0017[0m,optimize:0.0017,refine:2.4e-06,avg_time=0.00069
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 19]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.058,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.04,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.053,rebound.
+[ego_planner_node-2] [32miter(+1)=31,time(ms)=0.145, collided, keep optimizing
+[ego_planner_node-2] [0miter=22,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.057,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.055,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.031,rebound.
+[ego_planner_node-2] [32miter(+1)=36,time(ms)=0.189,total_t(ms)=1.008,cost=1.271
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0011[0m,optimize:0.0011,refine:2.5e-06,avg_time=0.00072
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 20]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=10,time(ms)=0.063,rebound.
+[ego_planner_node-2] iter=24,time(ms)=0.057,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.051,rebound.
+[ego_planner_node-2] [32miter(+1)=17,time(ms)=0.032,total_t(ms)=0.215,cost=0.196
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00031[0m,optimize:0.0003,refine:1.6e-06,avg_time=0.00069
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 21]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=23,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.03,rebound.
+[ego_planner_node-2] [32miter(+1)=46,time(ms)=0.192,total_t(ms)=0.360,cost=0.127
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00048[0m,optimize:0.00048,refine:2.2e-06,avg_time=0.00068
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [WARN] [1777781448.543525892] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=1
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 22]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=11,time(ms)=0.076,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.039,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.065,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.057,rebound.
+[ego_planner_node-2] [ERROR] [1777781448.544132873] [Coord2Index]: Ran out of pool, index=76 -1 56, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570246630] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570359134] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781448.570501674] [Coord2Index]: Ran out of pool, index=78 -1 56, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570518316] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570525871] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] iter=26,time(ms)=26,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.076,rebound.
+[ego_planner_node-2] [ERROR] [1777781448.570570243] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570594063] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570601833] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781448.570635096] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570643677] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570650173] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781448.570680819] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570689164] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570695636] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781448.570725224] [Coord2Index]: Ran out of pool, index=79 -1 55, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.570733500] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.570739909] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] iter=5,time(ms)=0.064,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.043,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.041,rebound.
+[ego_planner_node-2] [32miter(+1)=4,time(ms)=0.027, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=30,time(ms)=0.085, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=20,time(ms)=0.047,total_t(ms)=27.439,cost=2.922
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.028[0m,optimize:0.028,refine:3.6e-06,avg_time=0.0023
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 23]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=6,time(ms)=0.049,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.08,rebound.
+[ego_planner_node-2] iter=24,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=34,time(ms)=0.16,rebound.
+[ego_planner_node-2] [32miter(+1)=34,time(ms)=0.143, collided, keep optimizing
+[ego_planner_node-2] [0miter=11,time(ms)=0.098,rebound.
+[ego_planner_node-2] iter=25,time(ms)=0.13,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.027,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=59,time(ms)=0.335, collided, keep optimizing
+[ego_planner_node-2] [0miter=20,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=16,time(ms)=0.072,rebound.
+[ego_planner_node-2] iter=36,time(ms)=0.24,rebound.
+[ego_planner_node-2] [32miter(+1)=74,time(ms)=0.441, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [WARN] [1777781448.596290932] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=1
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 24]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=16,time(ms)=0.073,rebound.
+[ego_planner_node-2] iter=36,time(ms)=0.38,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=60,time(ms)=0.31,rebound.
+[ego_planner_node-2] [ERROR] [1777781448.598475569] [Coord2Index]: Ran out of pool, index=-1 26 66, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781448.598517137] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781448.598528711] [initControlPoints]: a star error, force return!
+[ego_planner_node-2] [32miter(+1)=57,time(ms)=0.296, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=65,time(ms)=0.345, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=74,time(ms)=0.406, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 25]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=8[1;0m
+[ego_planner_node-2] iter=16,time(ms)=0.08,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.092,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.2,rebound.
+[ego_planner_node-2] iter=25,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.054,rebound.
+[ego_planner_node-2] [32miter(+1)=95,time(ms)=0.491, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=95,time(ms)=0.513, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=56,time(ms)=0.306, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=16,time(ms)=0.069,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.095,rebound.
+[ego_planner_node-2] iter=46,time(ms)=0.23,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.07,rebound.
+[ego_planner_node-2] iter=36,time(ms)=0.17,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.2,rebound.
+[ego_planner_node-2] [32miter(+1)=121,time(ms)=0.646, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=192,time(ms)=1.099, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=53,time(ms)=0.309, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] iter=20,time(ms)=0.088,rebound.
+[ego_planner_node-2] iter=54,time(ms)=0.3,rebound.
+[ego_planner_node-2] iter=131,time(ms)=0.67,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.065,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.051,rebound.
+[ego_planner_node-2] [32miter(+1)=137,time(ms)=0.707, collided, keep optimizing
+[ego_planner_node-2] [0miter=65,time(ms)=0.45,rebound.
+[ego_planner_node-2] [32miter(+1)=82,time(ms)=0.434,total_t(ms)=2.849,cost=2.188
+[ego_planner_node-2] [0mtraj 3 success.
+[ego_planner_node-2] iter=17,time(ms)=0.074,rebound.
+[ego_planner_node-2] iter=80,time(ms)=0.42,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.1,rebound.
+[ego_planner_node-2] [32miter(+1)=132,time(ms)=0.662, collided, keep optimizing
+[ego_planner_node-2] [0miter=12,time(ms)=0.053,rebound.
+[ego_planner_node-2] [32miter(+1)=104,time(ms)=0.565, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=73,time(ms)=0.389, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 4 failed.
+[ego_planner_node-2] iter=15,time(ms)=0.065,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.079,rebound.
+[ego_planner_node-2] iter=24,time(ms)=0.12,rebound.
+[ego_planner_node-2] iter=36,time(ms)=0.18,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.035,rebound.
+[ego_planner_node-2] [32miter(+1)=99,time(ms)=0.526, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=64,time(ms)=0.320, collided, keep optimizing
+[ego_planner_node-2] [0miter=43,time(ms)=0.22,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.072,rebound.
+[ego_planner_node-2] [32miter(+1)=102,time(ms)=0.557, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 5 failed.
+[ego_planner_node-2] iter=16,time(ms)=0.079,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.33,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.095,rebound.
+[ego_planner_node-2] iter=49,time(ms)=0.24,rebound.
+[ego_planner_node-2] iter=40,time(ms)=0.21,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.055,rebound.
+[ego_planner_node-2] iter=29,time(ms)=0.17,rebound.
+[ego_planner_node-2] iter=78,time(ms)=0.45,rebound.
+[ego_planner_node-2] [32miter(+1)=88,time(ms)=0.482, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=57,time(ms)=0.306, collided, keep optimizing
+[ego_planner_node-2] [0miter=8,time(ms)=0.041,rebound.
+[ego_planner_node-2] [32miter(+1)=68,time(ms)=0.386, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 6 failed.
+[ego_planner_node-2] iter=18,time(ms)=0.079,rebound.
+[ego_planner_node-2] iter=17,time(ms)=0.071,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.033,rebound.
+[ego_planner_node-2] iter=55,time(ms)=0.27,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.066,rebound.
+[ego_planner_node-2] [32miter(+1)=90,time(ms)=0.463,total_t(ms)=1.045,cost=1.080
+[ego_planner_node-2] [0mtraj 7 success.
+[ego_planner_node-2] iter=18,time(ms)=0.087,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.039,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.047,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.07,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.1,rebound.
+[ego_planner_node-2] [32miter(+1)=91,time(ms)=0.463, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=50,time(ms)=0.252,total_t(ms)=1.111,cost=1.847
+[ego_planner_node-2] [0mtraj 8 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.018[0m,optimize:0.018,refine:2.5e-06,avg_time=0.0032
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 26]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=17,time(ms)=0.069,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.048,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.049,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.076,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.056,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.057,rebound.
+[ego_planner_node-2] [32miter(+1)=47,time(ms)=0.134,total_t(ms)=0.505,cost=0.928
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=14,time(ms)=0.028,rebound.
+[ego_planner_node-2] iter=42,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=24,time(ms)=0.052, collided, keep optimizing
+[ego_planner_node-2] [0miter=15,time(ms)=0.034,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.058,rebound.
+[ego_planner_node-2] [32miter(+1)=23,time(ms)=0.046, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=24,time(ms)=0.050,total_t(ms)=0.471,cost=2.791
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0011[0m,optimize:0.0011,refine:2.4e-06,avg_time=0.003
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 27]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=14,time(ms)=0.069,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.039,rebound.
+[ego_planner_node-2] iter=16,time(ms)=0.076,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.023,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=33,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=33,time(ms)=0.091, collided, keep optimizing
+[ego_planner_node-2] [0miter=35,time(ms)=0.099,rebound.
+[ego_planner_node-2] [32miter(+1)=39,time(ms)=0.108,total_t(ms)=0.907,cost=2.052
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.001[0m,optimize:0.001,refine:2.4e-06,avg_time=0.0029
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 28]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=11,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.06,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.039,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=16,time(ms)=0.075,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.12,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.046,rebound.
+[ego_planner_node-2] [32miter(+1)=14,time(ms)=0.064, collided, keep optimizing
+[ego_planner_node-2] [0miter=68,time(ms)=0.51,rebound.
+[ego_planner_node-2] [32miter(+1)=34,time(ms)=0.195, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=35,time(ms)=0.209,total_t(ms)=1.738,cost=4.926
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0019[0m,optimize:0.0019,refine:2.4e-06,avg_time=0.0029
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 29]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.05,rebound.
+[ego_planner_node-2] iter=34,time(ms)=0.16,rebound.
+[ego_planner_node-2] [32miter(+1)=17,time(ms)=0.063, collided, keep optimizing
+[ego_planner_node-2] [0miter=16,time(ms)=0.07,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.049,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.061,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.063,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.042,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.088,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.033,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.044,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=39,time(ms)=0.27,rebound.
+[ego_planner_node-2] [WARN] [1777781449.744678064] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.277448
+[ego_planner_node-2] traj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 30]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=17,time(ms)=0.097,rebound.
+[ego_planner_node-2] [32miter(+1)=95,time(ms)=0.418,total_t(ms)=0.522,cost=0.028
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=19,time(ms)=0.074,rebound.
+[ego_planner_node-2] iter=17,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=108,time(ms)=0.52,rebound.
+[ego_planner_node-2] iter=66,time(ms)=0.33,rebound.
+[ego_planner_node-2] [32miter(+1)=83,time(ms)=0.432, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=73,time(ms)=0.372, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=66,time(ms)=0.352, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] iter=5,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=151,time(ms)=0.77,rebound.
+[ego_planner_node-2] [32miter(+1)=66,time(ms)=0.327, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=127,time(ms)=0.652, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=121,time(ms)=0.509, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 3 failed.
+[ego_planner_node-2] iter=15,time(ms)=0.053,rebound.
+[ego_planner_node-2] iter=40,time(ms)=0.12,rebound.
+[ego_planner_node-2] [32miter(+1)=161,time(ms)=0.500, collided, keep optimizing
+[ego_planner_node-2] [0miter=20,time(ms)=0.086,rebound.
+[ego_planner_node-2] iter=147,time(ms)=0.56,rebound.
+[ego_planner_node-2] [32miter(+1)=66,time(ms)=0.234, collided, keep optimizing
+[ego_planner_node-2] [0miter=63,time(ms)=0.25,rebound.
+[ego_planner_node-2] iter=45,time(ms)=0.17,rebound.
+[ego_planner_node-2] iter=66,time(ms)=0.26,rebound.
+[ego_planner_node-2] [32miter(+1)=101,time(ms)=0.377, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 4 failed.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0085[0m,optimize:0.0084,refine:2.5e-06,avg_time=0.0031
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 31]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=25,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.037,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.044,rebound.
+[ego_planner_node-2] iter=60,time(ms)=0.26,rebound.
+[ego_planner_node-2] [32miter(+1)=26,time(ms)=0.065,total_t(ms)=0.526,cost=0.490
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00066[0m,optimize:0.00066,refine:1.8e-06,avg_time=0.003
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 32]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=26,time(ms)=0.13,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.085,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.065,rebound.
+[ego_planner_node-2] iter=36,time(ms)=0.19,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.036,rebound.
+[ego_planner_node-2] iter=33,time(ms)=0.6,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.032,rebound.
+[ego_planner_node-2] iter=39,time(ms)=0.22,rebound.
+[ego_planner_node-2] [32miter(+1)=54,time(ms)=0.308,total_t(ms)=1.820,cost=0.833
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.002[0m,optimize:0.002,refine:2.7e-06,avg_time=0.003
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 33]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.044,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.083,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=26,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.1,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.088,rebound.
+[ego_planner_node-2] iter=40,time(ms)=0.25,rebound.
+[ego_planner_node-2] [WARN] [1777781449.895170471] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[ego_planner_node-2] [32miter(+1)=35,time(ms)=0.222, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=46,time(ms)=0.290, collided, keep optimizing
+[ego_planner_node-2] [0miter=22,time(ms)=0.16,rebound.
+[ego_planner_node-2] [WARN] [1777781449.895233345] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[ego_planner_node-2] iter=5,time(ms)=0.033,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.027,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.12,rebound.
+[ego_planner_node-2] [32miter(+1)=59,time(ms)=0.388,total_t(ms)=2.196,cost=3.844
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=8,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.096,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.043,rebound.
+[ego_planner_node-2] iter=32,time(ms)=0.24,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.03,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.05,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.13,rebound.
+[ego_planner_node-2] [32miter(+1)=25,time(ms)=0.143, collided, keep optimizing
+[ego_planner_node-2] [0miter=14,time(ms)=0.077,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.103,total_t(ms)=1.055,cost=2.542
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0035[0m,optimize:0.0035,refine:2.7e-06,avg_time=0.003
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 34]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.043,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.07,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.083,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.071,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.082,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.072,rebound.
+[ego_planner_node-2] iter=12,time(ms)=0.12,rebound.
+[ego_planner_node-2] [ERROR] [1777781449.944021537] [Coord2Index]: Ran out of pool, index=100 61 62, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781449.944059095] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781449.944070067] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781449.944117098] [Coord2Index]: Ran out of pool, index=100 62 61, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781449.944127600] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781449.944135042] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781449.944171871] [Coord2Index]: Ran out of pool, index=100 63 61, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781449.944181432] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781449.944188368] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] [ERROR] [1777781449.944221332] [Coord2Index]: Ran out of pool, index=100 63 61, POOL_SIZE=100 100 100
+[ego_planner_node-2] [ERROR] [1777781449.944230980] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ego_planner_node-2] [ERROR] [1777781449.944237905] [check_collision_and_rebound]: a star error
+[ego_planner_node-2] iter=5,time(ms)=0.052,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.047,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.046,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.04,rebound.
+[ego_planner_node-2] [32miter(+1)=24,time(ms)=0.132,total_t(ms)=1.009,cost=1.274
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0012[0m,optimize:0.0012,refine:2.6e-06,avg_time=0.0029
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[python3-5] [INFO] [1777781450.112649042] [lidar_depth_fusion_node]: fusion frame=20 depth_pts=7763 lidar_pts=8764 fused_voxels=14497 depth_only=5832 lidar_only=6734 dual=1931 retention=1.000 min_prob=0.300
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 35]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=7,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=38,time(ms)=0.2,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.07,rebound.
+[ego_planner_node-2] [32miter(+1)=33,time(ms)=0.157,total_t(ms)=0.505,cost=0.198
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00066[0m,optimize:0.00066,refine:2.6e-06,avg_time=0.0029
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 36]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=35,time(ms)=0.165,total_t(ms)=0.165,cost=0.031
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00031[0m,optimize:0.00031,refine:2.7e-06,avg_time=0.0028
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 37]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=26,time(ms)=0.17,rebound.
+[ego_planner_node-2] iter=51,time(ms)=0.25,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.124,total_t(ms)=0.579,cost=0.118
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] [32miter(+1)=41,time(ms)=0.175,total_t(ms)=0.175,cost=0.037
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] iter=14,time(ms)=0.06,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.082,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.036,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.024,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=18,time(ms)=0.082,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.052,rebound.
+[ego_planner_node-2] [32miter(+1)=27,time(ms)=0.125,total_t(ms)=0.529,cost=0.841
+[ego_planner_node-2] [0mtraj 3 success.
+[ego_planner_node-2] iter=14,time(ms)=0.052,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.14,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.056,rebound.
+[ego_planner_node-2] iter=17,time(ms)=0.08,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.035,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.071,rebound.
+[ego_planner_node-2] iter=50,time(ms)=0.26,rebound.
+[ego_planner_node-2] [32miter(+1)=28,time(ms)=0.133, collided, keep optimizing
+[ego_planner_node-2] [0miter=51,time(ms)=0.27,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.065,rebound.
+[ego_planner_node-2] [32miter(+1)=28,time(ms)=0.142, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=17,time(ms)=0.072,total_t(ms)=1.464,cost=4.603
+[ego_planner_node-2] [0mtraj 4 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0032[0m,optimize:0.0032,refine:3e-06,avg_time=0.0028
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 38]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=8,time(ms)=0.55,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.24,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.051,rebound.
+[ego_planner_node-2] iter=15,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.052,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.079,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.08,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.047,rebound.
+[ego_planner_node-2] iter=27,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=26,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.063,rebound.
+[ego_planner_node-2] iter=20,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=42,time(ms)=0.34,rebound.
+[ego_planner_node-2] [32miter(+1)=25,time(ms)=0.072, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=52,time(ms)=0.183, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=40,time(ms)=0.129, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=13,time(ms)=0.034,rebound.
+[ego_planner_node-2] iter=67,time(ms)=0.19,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.078,total_t(ms)=0.310,cost=0.032
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0033[0m,optimize:0.0033,refine:1.5e-06,avg_time=0.0028
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 39]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=8,time(ms)=0.054,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.072,rebound.
+[ego_planner_node-2] iter=47,time(ms)=0.28,rebound.
+[ego_planner_node-2] [32miter(+1)=29,time(ms)=0.144, collided, keep optimizing
+[ego_planner_node-2] [0miter=19,time(ms)=0.14,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.06,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.089,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.12,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.17,rebound.
+[ego_planner_node-2] [32miter(+1)=43,time(ms)=0.252, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=23,time(ms)=0.131, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=8,time(ms)=0.037,rebound.
+[ego_planner_node-2] iter=23,time(ms)=0.12,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=32,time(ms)=0.21,rebound.
+[ego_planner_node-2] [32miter(+1)=36,time(ms)=0.185,total_t(ms)=0.618,cost=0.436
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0025[0m,optimize:0.0025,refine:2.5e-06,avg_time=0.0028
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 40]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=16,time(ms)=0.091,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.04,rebound.
+[ego_planner_node-2] [32miter(+1)=52,time(ms)=0.249, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=19,time(ms)=0.073,total_t(ms)=0.508,cost=0.703
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00065[0m,optimize:0.00065,refine:2.6e-06,avg_time=0.0027
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 41]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=22,time(ms)=0.106,total_t(ms)=0.106,cost=0.022
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00031[0m,optimize:0.00031,refine:1.9e-06,avg_time=0.0027
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 42]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=5,time(ms)=0.13,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.126,total_t(ms)=0.271,cost=0.020
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00041[0m,optimize:0.00041,refine:2.8e-06,avg_time=0.0026
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 43]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=22,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.031,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.059,rebound.
+[ego_planner_node-2] iter=38,time(ms)=0.18,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.078,total_t(ms)=0.481,cost=0.425
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=14,time(ms)=0.053,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.031,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.073,rebound.
+[ego_planner_node-2] [32miter(+1)=35,time(ms)=0.157,total_t(ms)=0.326,cost=0.453
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.001[0m,optimize:0.001,refine:2.5e-06,avg_time=0.0025
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 44]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] [32miter(+1)=24,time(ms)=0.059, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=14,time(ms)=0.025,total_t(ms)=0.108,cost=0.139
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=28,time(ms)=0.074,rebound.
+[ego_planner_node-2] [32miter(+1)=23,time(ms)=0.047,total_t(ms)=0.127,cost=0.092
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00036[0m,optimize:0.00036,refine:1.7e-06,avg_time=0.0025
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 45]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=12,time(ms)=0.043,total_t(ms)=0.043,cost=0.046
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00017[0m,optimize:0.00017,refine:2.3e-06,avg_time=0.0024
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 46]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=24,time(ms)=0.11,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.091,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.022,total_t(ms)=0.270,cost=0.511
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.031, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=9,time(ms)=0.014,total_t(ms)=0.057,cost=0.216
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0006[0m,optimize:0.0006,refine:2.6e-06,avg_time=0.0024
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 47]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.049,total_t(ms)=0.050,cost=0.041
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00025[0m,optimize:0.00025,refine:3.7e-06,avg_time=0.0023
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 48]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] [32miter(+1)=19,time(ms)=0.052,total_t(ms)=0.052,cost=0.091
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] [32miter(+1)=19,time(ms)=0.036, collided, keep optimizing
+[ego_planner_node-2] [0miter=5,time(ms)=0.021,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.016, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=6,time(ms)=0.010, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00036[0m,optimize:0.00036,refine:1.5e-06,avg_time=0.0023
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 49]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] [32miter(+1)=22,time(ms)=0.095, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=13,time(ms)=0.044, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.006, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=11,time(ms)=0.045,rebound.
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.061,total_t(ms)=0.115,cost=0.247
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00056[0m,optimize:0.00055,refine:2.7e-06,avg_time=0.0022
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 50]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=10,time(ms)=0.35,rebound.
+[ego_planner_node-2] iter=17,time(ms)=0.087,rebound.
+[ego_planner_node-2] iter=21,time(ms)=0.089,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.22,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.03,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.034,rebound.
+[ego_planner_node-2] [32miter(+1)=18,time(ms)=0.075, collided, keep optimizing
+[ego_planner_node-2] [0miter=12,time(ms)=0.1,rebound.
+[ego_planner_node-2] [32miter(+1)=15,time(ms)=0.058, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=20,time(ms)=0.085, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.025, collided, keep optimizing
+[ego_planner_node-2] [0miter=9,time(ms)=0.036,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.032,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.029, collided, keep optimizing
+[ego_planner_node-2] [0miter=14,time(ms)=0.065,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.046,rebound.
+[ego_planner_node-2] iter=33,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=5,time(ms)=0.038,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.082,rebound.
+[ego_planner_node-2] [32miter(+1)=19,time(ms)=0.080, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 51]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=35,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=52,time(ms)=0.23,rebound.
+[ego_planner_node-2] [32miter(+1)=26,time(ms)=0.105, collided, keep optimizing
+[ego_planner_node-2] [0miter=27,time(ms)=0.15,rebound.
+[ego_planner_node-2] iter=42,time(ms)=0.34,rebound.
+[ego_planner_node-2] iter=41,time(ms)=0.22,rebound.
+[ego_planner_node-2] iter=43,time(ms)=0.23,rebound.
+[ego_planner_node-2] [32miter(+1)=39,time(ms)=0.189, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=36,time(ms)=0.171, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=62,time(ms)=0.26,rebound.
+[ego_planner_node-2] [32miter(+1)=23,time(ms)=0.087, collided, keep optimizing
+[ego_planner_node-2] [0miter=40,time(ms)=0.18,rebound.
+[ego_planner_node-2] [32miter(+1)=30,time(ms)=0.124, collided, keep optimizing
+[ego_planner_node-2] [0miter=71,time(ms)=0.4,rebound.
+[ego_planner_node-2] [32miter(+1)=70,time(ms)=0.362,total_t(ms)=1.498,cost=3.388
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.004[0m,optimize:0.004,refine:3.3e-06,avg_time=0.0023
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 52]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=13,time(ms)=0.044,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.025,rebound.
+[ego_planner_node-2] iter=22,time(ms)=0.075,rebound.
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.017, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=13,time(ms)=0.026, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=27,time(ms)=0.067, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 53]==============================================[0m
+[ego_planner_node-2] i=0 RichInfoSegs.size()=2
+[ego_planner_node-2] RichInfoSegs[i].first.size=1
+[ego_planner_node-2] RichInfoSegs[i].first.direction.size()=1
+[ego_planner_node-2] RichInfoSegs[i].first.direction[0].size()=1
+[ego_planner_node-2] RichInfoSegs[i].first.points.cols()=1
+[ego_planner_node-2] RichInfoSegs[i].first.base_point.size()=1
+[ego_planner_node-2] RichInfoSegs[i].first.base_point[0].size()=1
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=14,time(ms)=0.094,rebound.
+[ego_planner_node-2] iter=29,time(ms)=0.073,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.033,rebound.
+[ego_planner_node-2] [32miter(+1)=44,time(ms)=0.106, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=31,time(ms)=0.077, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=21,time(ms)=0.049,total_t(ms)=0.467,cost=9.820
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=8,time(ms)=0.067,rebound.
+[ego_planner_node-2] iter=32,time(ms)=0.078,rebound.
+[ego_planner_node-2] [32miter(+1)=41,time(ms)=0.095, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=27,time(ms)=0.061,total_t(ms)=0.316,cost=5.259
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] iter=25,time(ms)=0.062,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.038, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=9,time(ms)=0.015,total_t(ms)=0.126,cost=0.585
+[ego_planner_node-2] [0mtraj 3 success.
+[ego_planner_node-2] [32miter(+1)=29,time(ms)=0.060, collided, keep optimizing
+[ego_planner_node-2] [0miter=14,time(ms)=0.032,rebound.
+[ego_planner_node-2] [32miter(+1)=12,time(ms)=0.021, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=20,time(ms)=0.047, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 4 failed.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0012[0m,optimize:0.0012,refine:2.1e-06,avg_time=0.0022
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 54]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] [32miter(+1)=22,time(ms)=0.086, collided, keep optimizing
+[ego_planner_node-2] [0miter=8,time(ms)=0.037,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.034,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.029,rebound.
+[ego_planner_node-2] [32miter(+1)=11,time(ms)=0.033,total_t(ms)=0.254,cost=1.029
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=11,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.03,rebound.
+[ego_planner_node-2] [32miter(+1)=14,time(ms)=0.043, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=9,time(ms)=0.028, collided, keep optimizing
+[ego_planner_node-2] [0miter=5,time(ms)=0.029,rebound.
+[ego_planner_node-2] iter=9,time(ms)=0.031,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.042, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 2 failed.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00074[0m,optimize:0.00073,refine:2.7e-06,avg_time=0.0022
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 55]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=10,time(ms)=0.07,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.05,rebound.
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.024, collided, keep optimizing
+[ego_planner_node-2] [0miter=7,time(ms)=0.035,rebound.
+[ego_planner_node-2] iter=19,time(ms)=0.076,rebound.
+[ego_planner_node-2] [32miter(+1)=17,time(ms)=0.054, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=11,time(ms)=0.033, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=10,time(ms)=0.043,rebound.
+[ego_planner_node-2] iter=14,time(ms)=0.05,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.035, collided, keep optimizing
+[ego_planner_node-2] [0miter=6,time(ms)=0.027,rebound.
+[ego_planner_node-2] iter=11,time(ms)=0.045,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.026,total_t(ms)=0.241,cost=1.284
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00094[0m,optimize:0.00094,refine:3e-06,avg_time=0.0022
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 56]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=16,time(ms)=0.043,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.016, collided, keep optimizing
+[ego_planner_node-2] [0miter=8,time(ms)=0.038,rebound.
+[ego_planner_node-2] [32miter(+1)=22,time(ms)=0.040, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=6,time(ms)=0.009,total_t(ms)=0.178,cost=1.332
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=13,time(ms)=0.027,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.015,total_t(ms)=0.043,cost=0.303
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00034[0m,optimize:0.00034,refine:1.6e-06,avg_time=0.0021
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 57]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.047, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.007, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=1,time(ms)=0.006, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] plan_success=0
+[ego_planner_node-2] refine_success=0
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 58]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=4[1;0m
+[ego_planner_node-2] iter=9,time(ms)=0.064,rebound.
+[ego_planner_node-2] iter=13,time(ms)=0.066,rebound.
+[ego_planner_node-2] iter=25,time(ms)=0.11,rebound.
+[ego_planner_node-2] [32miter(+1)=20,time(ms)=0.074, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=14,time(ms)=0.050, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=17,time(ms)=0.059, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 1 failed.
+[ego_planner_node-2] iter=37,time(ms)=0.16,rebound.
+[ego_planner_node-2] iter=6,time(ms)=0.032,rebound.
+[ego_planner_node-2] [32miter(+1)=21,time(ms)=0.076, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=14,time(ms)=0.046,total_t(ms)=0.361,cost=1.571
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] iter=11,time(ms)=0.051,rebound.
+[ego_planner_node-2] [32miter(+1)=84,time(ms)=0.358, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=13,time(ms)=0.040, collided, keep optimizing
+[ego_planner_node-2] [0miter=31,time(ms)=0.14,rebound.
+[ego_planner_node-2] [32miter(+1)=25,time(ms)=0.096, collided, keep optimizing
+[ego_planner_node-2] [0mtraj 3 failed.
+[ego_planner_node-2] iter=29,time(ms)=0.12,rebound.
+[ego_planner_node-2] [32miter(+1)=33,time(ms)=0.135, collided, keep optimizing
+[ego_planner_node-2] [0m[32miter(+1)=13,time(ms)=0.040,total_t(ms)=0.311,cost=1.156
+[ego_planner_node-2] [0mtraj 4 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.0025[0m,optimize:0.0025,refine:2.8e-06,avg_time=0.0021
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 59]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] iter=8,time(ms)=0.045,rebound.
+[ego_planner_node-2] iter=7,time(ms)=0.046,rebound.
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.025,total_t(ms)=0.133,cost=0.364
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00027[0m,optimize:0.00027,refine:2.2e-06,avg_time=0.0021
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[python3-5] [INFO] [1777781460.722897223] [lidar_depth_fusion_node]: fusion frame=40 depth_pts=7130 lidar_pts=7233 fused_voxels=12820 depth_only=5683 lidar_only=5690 dual=1447 retention=1.000 min_prob=0.300
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 60]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=2[1;0m
+[ego_planner_node-2] iter=8,time(ms)=0.23,rebound.
+[ego_planner_node-2] iter=16,time(ms)=0.055,rebound.
+[ego_planner_node-2] iter=10,time(ms)=0.046,rebound.
+[ego_planner_node-2] iter=24,time(ms)=0.13,rebound.
+[ego_planner_node-2] [32miter(+1)=13,time(ms)=0.038,total_t(ms)=0.526,cost=0.866
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] iter=13,time(ms)=0.041,rebound.
+[ego_planner_node-2] iter=8,time(ms)=0.035,rebound.
+[ego_planner_node-2] [32miter(+1)=10,time(ms)=0.025,total_t(ms)=0.108,cost=0.325
+[ego_planner_node-2] [0mtraj 2 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00079[0m,optimize:0.00079,refine:2.4e-06,avg_time=0.0021
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [SAFETY]: from EXEC_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 61]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.031,total_t(ms)=0.032,cost=0.039
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m0.00012[0m,optimize:0.00012,refine:2.3e-06,avg_time=0.002
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ
+[ego_planner_node-2] [FSM]: state: EXEC_TRAJ
+[ego_planner_node-2] [FSM]: from EXEC_TRAJ to REPLAN_TRAJ
+[ego_planner_node-2] [47;30m
+[ego_planner_node-2] [drone 0 replan 62]==============================================[0m
+[ego_planner_node-2] [1;33mmulti-trajs=1[1;0m
+[ego_planner_node-2] [32miter(+1)=9,time(ms)=0.018,total_t(ms)=0.018,cost=0.037
+[ego_planner_node-2] [0mtraj 1 success.
+[ego_planner_node-2] plan_success=1
+[ego_planner_node-2] total time:[42m6.7e-05[0m,optimize:6.6e-05,refine:1.2e-06,avg_time=0.002
+[ego_planner_node-2] refine_success=1
+[ego_planner_node-2] [FSM]: from REPLAN_TRAJ to EXEC_TRAJ

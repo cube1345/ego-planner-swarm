@@ -1,0 +1,4 @@
+[INFO] [1777781181.736170293] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777781182.895269712] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[WARN] [1777781201.283712073] [distinctiveTrajs]: base_point and control point are too close!
+[WARN] [1777781202.896673684] [rebound_optimize]: Solver error. Return = -1008, A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions.. Skip this planning.

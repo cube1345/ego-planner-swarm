@@ -1,0 +1,1 @@
+[INFO] [1777787459.070090107] [drone_0_simulated_lidar]: simulated lidar ready. global=/map_generator/global_cloud odom=/drone_0_visual_slam/odom out=/drone_0_lidar/points

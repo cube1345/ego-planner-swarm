@@ -1,0 +1,3 @@
+[INFO] [1777789651.898420966] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777789654.034193964] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[INFO] [1777789654.035908099] [drone_0_ego_planner_node]: planNextWaypoint odom=(14.85, -0.03, 0.98) next_wp=(15.00, 0.00, 1.00)

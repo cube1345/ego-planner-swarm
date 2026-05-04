@@ -109,6 +109,7 @@ int init_broadcast(const char *ip, const int port)
   if (inet_pton(AF_INET, ip, &addr_udp_send_.sin_addr) <= 0)
   {
     printf("\nInvalid address/ Address not supported \n");
+    
     return -1;
   }
 

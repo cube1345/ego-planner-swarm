@@ -1,0 +1,6 @@
+[INFO] [1777789794.232606324] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777789795.414491354] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[INFO] [1777789795.415711464] [drone_0_ego_planner_node]: planNextWaypoint odom=(-15.00, 0.00, 0.10) next_wp=(15.00, 0.00, 1.00)
+[WARN] [1777789796.438815227] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0
+[WARN] [1777789797.455011594] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0
+[WARN] [1777789804.560146245] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0

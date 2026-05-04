@@ -54,7 +54,10 @@ namespace ego_planner
 
     if ((start_pt - local_target_pt).norm() < 0.2)
     {
-      cout << "Close to goal" << endl;
+      cout << "Close to goal"
+           << " start_pt=" << start_pt.transpose()
+           << " local_target_pt=" << local_target_pt.transpose()
+           << endl;
       continous_failures_count_++;
       return false;
     }

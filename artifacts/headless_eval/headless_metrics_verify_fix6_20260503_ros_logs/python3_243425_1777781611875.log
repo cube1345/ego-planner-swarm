@@ -1,0 +1,2 @@
+[INFO] [1777781611.945787029] [sim_flight_stats_report]: stats monitor started. duration=12.0s global=/map_generator/global_cloud occupancy=/drone_0_grid/grid_map/occupancy_inflate odom=/drone_0_visual_slam/odom replan_log_root=artifacts/headless_eval/headless_metrics_verify_fix6_20260503_ros_logs
+[INFO] [1777781612.560675170] [sim_flight_stats_report]: global obstacle snapshot captured: points=152095 voxels=37373 clusters=148

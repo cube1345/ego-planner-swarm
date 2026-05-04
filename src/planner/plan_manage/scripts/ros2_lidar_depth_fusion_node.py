@@ -57,6 +57,14 @@ class Scores:
     f1: float
 
 
+@dataclass
+class ModalityVoxelState:
+    keys: np.ndarray
+    key_tuples: list[Tuple[int, int, int]]
+    ranges: np.ndarray
+    counts: np.ndarray
+
+
 class LidarDepthFusionNode(Node):
     def __init__(self) -> None:
         super().__init__("lidar_depth_fusion_node")
@@ -80,6 +88,9 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("adaptive_min_probability_min", 0.20)
         self.declare_parameter("adaptive_min_probability_max", 0.35)
         self.declare_parameter("adaptive_min_probability_step", 0.02)
+        self.declare_parameter("adaptive_min_hits_enable", False)
+        self.declare_parameter("adaptive_min_hits_min", 1)
+        self.declare_parameter("adaptive_min_hits_max", 3)
         self.declare_parameter("adaptive_target_retention", 0.30)
         self.declare_parameter("adaptive_retention_band", 0.05)
         self.declare_parameter("adaptive_eval_range", 10.0)
@@ -116,6 +127,15 @@ class LidarDepthFusionNode(Node):
         self.adaptive_min_probability_step = float(
             self.get_parameter("adaptive_min_probability_step").value
         )
+        self.adaptive_min_hits_enable = bool(
+            self.get_parameter("adaptive_min_hits_enable").value
+        )
+        self.adaptive_min_hits_min = int(
+            self.get_parameter("adaptive_min_hits_min").value
+        )
+        self.adaptive_min_hits_max = int(
+            self.get_parameter("adaptive_min_hits_max").value
+        )
         self.adaptive_target_retention = float(
             self.get_parameter("adaptive_target_retention").value
         )
@@ -129,14 +149,24 @@ class LidarDepthFusionNode(Node):
         sync_slop = float(self.get_parameter("sync_slop").value)
         self.debug_period = int(self.get_parameter("publish_debug_stats_every").value)
         self.candidate_probabilities = self.build_probability_candidates()
+        self.candidate_min_hits = self.build_min_hits_candidates()
         self.candidate_scores = {
-            threshold: None for threshold in self.candidate_probabilities
+            (threshold, min_hits): None
+            for threshold in self.candidate_probabilities
+            for min_hits in self.candidate_min_hits
         }
         if self.adaptive_min_probability_enable and self.candidate_probabilities:
             center_index = len(self.candidate_probabilities) // 2
             self.current_min_probability = float(self.candidate_probabilities[center_index])
         else:
             self.current_min_probability = float(self.min_probability)
+        self.current_near_field_radius = float(self.near_field_radius)
+        if self.adaptive_min_hits_enable and self.candidate_min_hits:
+            center_index = len(self.candidate_min_hits) // 2
+            self.current_min_hits = int(self.candidate_min_hits[center_index])
+        else:
+            self.current_min_hits = int(self.min_hits)
+        self.current_lidar_growth = float(self.lidar_growth)
 
         self.vehicle_position = np.zeros(3, dtype=np.float64)
         self.have_odom = False
@@ -196,10 +226,15 @@ class LidarDepthFusionNode(Node):
         depth_pts = self.filter_points(depth_pts)
         lidar_pts = self.filter_points(lidar_pts)
 
-        fusion_state = self.build_fusion_state(depth_pts, lidar_pts)
-        self.auto_tune_min_probability(fusion_state, depth_pts, lidar_pts)
+        fusion_state = self.build_fusion_state(
+            depth_pts,
+            lidar_pts,
+            self.current_near_field_radius,
+            self.current_lidar_growth,
+        )
+        fusion_state = self.auto_tune_parameters(fusion_state, depth_pts, lidar_pts)
         fused_points, stats = self.select_fused_points(
-            fusion_state, self.current_min_probability
+            fusion_state, self.current_min_probability, self.current_min_hits
         )
         template_msg = depth_msg if stamp_to_ns(depth_msg.header.stamp) >= stamp_to_ns(lidar_msg.header.stamp) else lidar_msg
         cloud_msg = self.xyz_to_cloud(fused_points, template_msg)
@@ -212,7 +247,10 @@ class LidarDepthFusionNode(Node):
                 f"lidar_pts={stats['lidar_points']} fused_voxels={stats['fused_voxels']} "
                 f"depth_only={stats['depth_only_voxels']} lidar_only={stats['lidar_only_voxels']} "
                 f"dual={stats['dual_voxels']} retention={stats['retention_ratio']:.3f} "
-                f"min_prob={self.current_min_probability:.3f}"
+                f"min_prob={self.current_min_probability:.3f} "
+                f"near_radius={self.current_near_field_radius:.2f} "
+                f"lidar_growth={self.current_lidar_growth:.2f} "
+                f"min_hits={self.current_min_hits}"
             )
 
     def cloud_to_xyz(self, msg: PointCloud2) -> np.ndarray:
@@ -239,54 +277,85 @@ class LidarDepthFusionNode(Node):
         max_allowed_range = self.max_range if range_limit is None else min(self.max_range, range_limit)
         return pts[ranges <= max_allowed_range]
 
-    def depth_probability(self, ranges: np.ndarray) -> np.ndarray:
+    def depth_probability(self, ranges: np.ndarray, near_field_radius: float) -> np.ndarray:
         # Stronger in the near field, decays with distance.
         base = 0.25 + 0.55 * np.exp(-ranges / max(self.depth_decay, 1e-3))
-        near_bonus = np.where(ranges <= self.near_field_radius, 0.10, 0.0)
+        near_bonus = np.where(ranges <= near_field_radius, 0.10, 0.0)
         return clamp_prob(base + near_bonus)
 
-    def lidar_probability(self, ranges: np.ndarray) -> np.ndarray:
+    def lidar_probability(
+        self, ranges: np.ndarray, near_field_radius: float, lidar_growth: float
+    ) -> np.ndarray:
         # More reliable with distance and for sparse geometry.
-        base = 0.35 + 0.45 * (1.0 - np.exp(-ranges / max(self.lidar_growth, 1e-3)))
-        far_bonus = np.where(ranges > self.near_field_radius, 0.10, 0.0)
+        base = 0.35 + 0.45 * (1.0 - np.exp(-ranges / max(lidar_growth, 1e-3)))
+        far_bonus = np.where(ranges > near_field_radius, 0.10, 0.0)
         return clamp_prob(base + far_bonus)
 
-    def accumulate_voxels(
-        self,
-        voxels: Dict[Tuple[int, int, int], VoxelEvidence],
-        points: np.ndarray,
-        modality: str,
-    ) -> None:
+    def build_modality_state(self, points: np.ndarray) -> ModalityVoxelState:
         if points.size == 0:
-            return
+            return ModalityVoxelState(
+                keys=np.empty((0, 3), dtype=np.int32),
+                key_tuples=[],
+                ranges=np.empty((0,), dtype=np.float32),
+                counts=np.empty((0,), dtype=np.int32),
+            )
         keys = np.floor(points / self.resolution).astype(np.int32)
         unique_keys, inverse = np.unique(keys, axis=0, return_inverse=True)
         centers = (unique_keys.astype(np.float32) + 0.5) * self.resolution
         ranges = np.linalg.norm(centers - self.vehicle_position[None, :], axis=1)
+        voxel_counts = np.bincount(inverse, minlength=unique_keys.shape[0]).astype(np.int32)
+        key_tuples = [
+            (int(key_arr[0]), int(key_arr[1]), int(key_arr[2])) for key_arr in unique_keys
+        ]
+        return ModalityVoxelState(
+            keys=unique_keys,
+            key_tuples=key_tuples,
+            ranges=ranges.astype(np.float32),
+            counts=voxel_counts,
+        )
+
+    def accumulate_voxel_state(
+        self,
+        voxels: Dict[Tuple[int, int, int], VoxelEvidence],
+        state: ModalityVoxelState,
+        modality: str,
+        near_field_radius: float,
+        lidar_growth: float,
+    ) -> None:
+        if state.keys.size == 0:
+            return
 
         if modality == "depth":
-            probs = self.depth_probability(ranges)
+            probs = self.depth_probability(state.ranges, near_field_radius)
         else:
-            probs = self.lidar_probability(ranges)
+            probs = self.lidar_probability(state.ranges, near_field_radius, lidar_growth)
 
-        voxel_counts = np.bincount(inverse, minlength=unique_keys.shape[0])
-        hit_boost = np.minimum(np.log1p(voxel_counts), 1.6)
+        hit_boost = np.minimum(np.log1p(state.counts), 1.6)
         logits = np.log(probs / (1.0 - probs)) * hit_boost
 
-        for idx, key_arr in enumerate(unique_keys):
-            key = (int(key_arr[0]), int(key_arr[1]), int(key_arr[2]))
+        for idx, key in enumerate(state.key_tuples):
             item = voxels[key]
             item.logit_sum += float(logits[idx])
-            item.hits += int(voxel_counts[idx])
+            item.hits += int(state.counts[idx])
             if modality == "depth":
                 item.seen_depth = True
             else:
                 item.seen_lidar = True
 
-    def build_fusion_state(self, depth_pts: np.ndarray, lidar_pts: np.ndarray) -> dict:
+    def compute_fusion_output(
+        self,
+        depth_state: ModalityVoxelState,
+        lidar_state: ModalityVoxelState,
+        near_field_radius: float,
+        lidar_growth: float,
+    ) -> dict:
         voxels: Dict[Tuple[int, int, int], VoxelEvidence] = defaultdict(VoxelEvidence)
-        self.accumulate_voxels(voxels, depth_pts, "depth")
-        self.accumulate_voxels(voxels, lidar_pts, "lidar")
+        self.accumulate_voxel_state(
+            voxels, depth_state, "depth", near_field_radius, lidar_growth
+        )
+        self.accumulate_voxel_state(
+            voxels, lidar_state, "lidar", near_field_radius, lidar_growth
+        )
 
         candidate_voxels = len(voxels)
         voxel_probabilities: Dict[Tuple[int, int, int], float] = {}
@@ -297,14 +366,34 @@ class LidarDepthFusionNode(Node):
 
         return {
             "voxels": voxels,
-            "depth_points": int(depth_pts.shape[0]),
-            "lidar_points": int(lidar_pts.shape[0]),
             "candidate_voxels": int(candidate_voxels),
             "voxel_probabilities": voxel_probabilities,
             "voxel_hits": {key: evidence.hits for key, evidence in voxels.items()},
         }
 
-    def select_fused_points(self, fusion_state: dict, threshold: float) -> Tuple[np.ndarray, dict]:
+    def build_fusion_state(
+        self,
+        depth_pts: np.ndarray,
+        lidar_pts: np.ndarray,
+        near_field_radius: float,
+        lidar_growth: float,
+    ) -> dict:
+        depth_state = self.build_modality_state(depth_pts)
+        lidar_state = self.build_modality_state(lidar_pts)
+        fusion_state = self.compute_fusion_output(
+            depth_state, lidar_state, near_field_radius, lidar_growth
+        )
+        fusion_state["depth_state"] = depth_state
+        fusion_state["lidar_state"] = lidar_state
+        fusion_state["depth_points"] = int(depth_pts.shape[0])
+        fusion_state["lidar_points"] = int(lidar_pts.shape[0])
+        fusion_state["near_field_radius"] = float(near_field_radius)
+        fusion_state["lidar_growth"] = float(lidar_growth)
+        return fusion_state
+
+    def select_fused_points(
+        self, fusion_state: dict, threshold: float, min_hits: int
+    ) -> Tuple[np.ndarray, dict]:
         voxels = fusion_state["voxels"]
         voxel_probabilities = fusion_state["voxel_probabilities"]
         fused = []
@@ -314,7 +403,7 @@ class LidarDepthFusionNode(Node):
 
         for key, evidence in voxels.items():
             probability = float(voxel_probabilities[key])
-            if probability < threshold or evidence.hits < self.min_hits:
+            if probability < threshold or evidence.hits < min_hits:
                 continue
             if evidence.seen_depth and evidence.seen_lidar:
                 dual += 1
@@ -343,23 +432,26 @@ class LidarDepthFusionNode(Node):
         }
         return fused_np, stats
 
-    def auto_tune_min_probability(
+    def auto_tune_parameters(
         self, fusion_state: dict, depth_pts: np.ndarray, lidar_pts: np.ndarray
-    ) -> None:
-        if not self.adaptive_min_probability_enable:
-            return
+    ) -> dict:
+        if (
+            not self.adaptive_min_probability_enable
+            and not self.adaptive_min_hits_enable
+        ):
+            return fusion_state
         if not self.have_global or self.global_keys.size == 0:
-            return
+            return fusion_state
 
         local_gt_mask = (
             np.linalg.norm(self.global_centers - self.vehicle_position[None, :], axis=1)
             <= self.adaptive_eval_range
         )
         if not np.any(local_gt_mask):
-            return
+            return fusion_state
         gt_keys = self.keys_to_set(self.global_keys[local_gt_mask])
         if len(gt_keys) < self.adaptive_min_gt_voxels:
-            return
+            return fusion_state
 
         depth_keys = self.points_to_local_eval_keys(depth_pts)
         lidar_keys = self.points_to_local_eval_keys(lidar_pts)
@@ -369,51 +461,97 @@ class LidarDepthFusionNode(Node):
         best_single_f1 = max(depth_scores.f1, lidar_scores.f1)
 
         best_probability = self.current_min_probability
+        best_min_hits = self.current_min_hits
         best_score = None
+        current_candidate = (
+            round(self.current_min_probability, 4),
+            int(self.current_min_hits),
+        )
+
+        def candidate_distance(probability: float, min_hits: int) -> float:
+            return abs(probability - self.current_min_probability) + 0.25 * abs(
+                min_hits - self.current_min_hits
+            )
+
         voxel_probabilities = fusion_state.get("voxel_probabilities", {})
         voxel_hits = fusion_state.get("voxel_hits", {})
 
-        for threshold in self.candidate_probabilities:
-            predicted = {
-                key
-                for key, probability in voxel_probabilities.items()
-                if probability >= threshold and int(voxel_hits.get(key, 0)) >= self.min_hits
-            }
-            predicted = self.limit_keys_to_eval_range(predicted)
-            scores = self.compute_scores(predicted, gt_keys)
-            gain_recall = scores.recall - best_single_recall
-            gain_f1 = scores.f1 - best_single_f1
-            utility = gain_f1 + 0.35 * gain_recall
-            previous = self.candidate_scores[threshold]
-            ema_score = (
-                utility
-                if previous is None
-                else (1.0 - self.adaptive_score_alpha) * previous
-                + self.adaptive_score_alpha * utility
-            )
-            self.candidate_scores[threshold] = ema_score
-            if best_score is None or ema_score > best_score + 1e-9:
-                best_score = ema_score
-                best_probability = threshold
-            elif best_score is not None and abs(ema_score - best_score) <= 1e-9:
-                best_probability = min(best_probability, threshold)
+        for min_hits in self.candidate_min_hits:
+            for threshold in self.candidate_probabilities:
+                predicted = {
+                    key
+                    for key, probability in voxel_probabilities.items()
+                    if probability >= threshold and int(voxel_hits.get(key, 0)) >= min_hits
+                }
+                predicted = self.limit_keys_to_eval_range(predicted)
+                scores = self.compute_scores(predicted, gt_keys)
+                gain_recall = scores.recall - best_single_recall
+                gain_f1 = scores.f1 - best_single_f1
+                utility = gain_f1 + 0.35 * gain_recall
+                candidate_key = (round(threshold, 4), int(min_hits))
+                previous = self.candidate_scores[candidate_key]
+                ema_score = (
+                    utility
+                    if previous is None
+                    else (1.0 - self.adaptive_score_alpha) * previous
+                    + self.adaptive_score_alpha * utility
+                )
+                self.candidate_scores[candidate_key] = ema_score
+                if best_score is None or ema_score > best_score + 1e-9:
+                    best_score = ema_score
+                    best_probability = threshold
+                    best_min_hits = int(min_hits)
+                elif best_score is not None and abs(ema_score - best_score) <= 1e-9:
+                    best_distance = candidate_distance(
+                        best_probability, best_min_hits
+                    )
+                    if candidate_distance(threshold, min_hits) < best_distance:
+                        best_probability = threshold
+                        best_min_hits = int(min_hits)
 
-        self.current_min_probability = min(
-            self.adaptive_min_probability_max,
-            max(self.adaptive_min_probability_min, best_probability),
-        )
+        current_score = self.candidate_scores.get(current_candidate)
+        if (
+            current_score is not None
+            and best_score is not None
+            and best_score - current_score < 1e-4
+        ):
+            best_probability = self.current_min_probability
+            best_min_hits = self.current_min_hits
+
+        self.current_min_probability = float(best_probability)
+        self.current_min_hits = int(best_min_hits)
+        return fusion_state
 
     def build_probability_candidates(self) -> list[float]:
-        lower = min(self.adaptive_min_probability_min, self.adaptive_min_probability_max)
-        upper = max(self.adaptive_min_probability_min, self.adaptive_min_probability_max)
-        step = max(self.adaptive_min_probability_step, 1e-3)
+        if not self.adaptive_min_probability_enable:
+            return [round(self.min_probability, 4)]
+        return self.build_candidate_values(
+            self.adaptive_min_probability_min,
+            self.adaptive_min_probability_max,
+            self.adaptive_min_probability_step,
+            self.min_probability,
+        )
+
+    def build_min_hits_candidates(self) -> list[int]:
+        if not self.adaptive_min_hits_enable:
+            return [int(self.min_hits)]
+        lower = min(self.adaptive_min_hits_min, self.adaptive_min_hits_max)
+        upper = max(self.adaptive_min_hits_min, self.adaptive_min_hits_max)
+        return list(range(max(1, lower), max(1, upper) + 1))
+
+    def build_candidate_values(
+        self, lower_bound: float, upper_bound: float, step_size: float, fallback: float
+    ) -> list[float]:
+        lower = min(lower_bound, upper_bound)
+        upper = max(lower_bound, upper_bound)
+        step = max(step_size, 1e-3)
         candidate_values = []
         current = lower
         while current <= upper + 1e-9:
             candidate_values.append(round(current, 4))
             current += step
         if not candidate_values:
-            candidate_values = [round(self.min_probability, 4)]
+            candidate_values = [round(fallback, 4)]
         return candidate_values
 
     def voxel_keys(self, pts: np.ndarray) -> np.ndarray:

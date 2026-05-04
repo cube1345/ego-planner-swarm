@@ -1,0 +1,51 @@
+[INFO] [1777780629.078231813] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777780630.243262359] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[WARN] [1777780632.726533944] [distinctiveTrajs]: base_point and control point are too close!
+[WARN] [1777780636.502093210] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=1, j=0
+[ERROR] [1777780638.738490920] [Coord2Index]: Ran out of pool, index=-1 96 57, POOL_SIZE=100 100 100
+[ERROR] [1777780638.738534261] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780638.738544772] [check_collision_and_rebound]: a star error
+[ERROR] [1777780638.738592782] [Coord2Index]: Ran out of pool, index=-1 97 57, POOL_SIZE=100 100 100
+[ERROR] [1777780638.738605488] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780638.738613043] [check_collision_and_rebound]: a star error
+[ERROR] [1777780638.876433826] [Coord2Index]: Ran out of pool, index=17 33 100, POOL_SIZE=100 100 100
+[ERROR] [1777780638.876471558] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780638.876477537] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.176971035] [Coord2Index]: Ran out of pool, index=13 90 100, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177017144] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177023674] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177077405] [Coord2Index]: Ran out of pool, index=15 91 100, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177083471] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177087987] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177158021] [Coord2Index]: Ran out of pool, index=-1 78 99, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177163579] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177168062] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177193326] [Coord2Index]: Ran out of pool, index=-1 79 95, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177199046] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177203221] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177227722] [Coord2Index]: Ran out of pool, index=-1 79 94, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177233353] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177237585] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177261818] [Coord2Index]: Ran out of pool, index=-1 78 92, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177267453] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177271790] [check_collision_and_rebound]: a star error
+[ERROR] [1777780643.177295616] [Coord2Index]: Ran out of pool, index=-1 78 91, POOL_SIZE=100 100 100
+[ERROR] [1777780643.177301186] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780643.177305553] [check_collision_and_rebound]: a star error
+[WARN] [1777780643.576320923] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.000000
+[WARN] [1777780643.577037277] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.000000
+[WARN] [1777780643.577375761] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.000000
+[WARN] [1777780643.577778190] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.000000
+[WARN] [1777780643.578107410] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.000000
+[WARN] [1777780643.578113867] [drone_0_ego_planner_node]: Suddenly discovered obstacles. emergency stop! time=0.000000
+[WARN] [1777780643.609746259] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.107558
+[WARN] [1777780643.610970395] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.106990
+[WARN] [1777780643.611741387] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.112385
+[WARN] [1777780643.613554638] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.107303
+[WARN] [1777780643.614212858] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.106616
+[WARN] [1777780643.614460421] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.116244
+[WARN] [1777780649.228414013] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[WARN] [1777780649.228449485] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[ERROR] [1777780650.326429636] [Coord2Index]: Ran out of pool, index=-1 25 76, POOL_SIZE=100 100 100
+[ERROR] [1777780650.326486765] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777780650.326499169] [initControlPoints]: a star error, force return!

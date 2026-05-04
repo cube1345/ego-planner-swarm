@@ -1,0 +1,10 @@
+1777781605.7598562 [INFO] [launch]: All log files can be found below artifacts/headless_eval/headless_metrics_verify_fix6_20260503_ros_logs/2026-05-03-12-13-25-759175-Cubot-243216
+1777781605.7599733 [INFO] [launch]: Default logging verbosity is set to INFO
+1777781605.8310084 [INFO] [random_forest-1]: process started with pid [243218]
+1777781605.8312242 [INFO] [ego_planner_node-2]: process started with pid [243220]
+1777781605.8313296 [INFO] [traj_server-3]: process started with pid [243222]
+1777781605.8314087 [INFO] [simulated_lidar_cloud.py-4]: process started with pid [243224]
+1777781605.8314841 [INFO] [python3-5]: process started with pid [243226]
+1777781605.8315601 [INFO] [poscmd_2_odom-6]: process started with pid [243228]
+1777781605.8316453 [INFO] [odom_visualization-7]: process started with pid [243230]
+1777781605.8317072 [INFO] [pcl_render_node-8]: process started with pid [243232]

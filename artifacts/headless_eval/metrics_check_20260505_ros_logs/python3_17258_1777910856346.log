@@ -1,0 +1,4 @@
+[INFO] [1777910856.431948394] [lidar_depth_fusion_node]: Fusion node ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points out=/drone_0_fusion/fused_cloud frame=world
+[INFO] [1777910866.540781132] [lidar_depth_fusion_node]: fusion frame=20 depth_pts=4932 lidar_pts=5596 fused_voxels=9051 depth_only=3600 lidar_only=4730 dual=721 retention=1.000 min_prob=0.280 near_radius=4.00 lidar_growth=5.00 min_hits=1
+[INFO] [1777910878.233188906] [lidar_depth_fusion_node]: fusion frame=40 depth_pts=5775 lidar_pts=6519 fused_voxels=9913 depth_only=3593 lidar_only=5250 dual=1070 retention=1.000 min_prob=0.280 near_radius=4.00 lidar_growth=5.00 min_hits=1
+[INFO] [1777910891.012963088] [lidar_depth_fusion_node]: fusion frame=60 depth_pts=6693 lidar_pts=5994 fused_voxels=10010 depth_only=4191 lidar_only=4694 dual=1125 retention=1.000 min_prob=0.280 near_radius=4.00 lidar_growth=5.00 min_hits=1

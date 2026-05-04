@@ -1,0 +1,75 @@
+[INFO] [1777781339.854050725] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777781341.035860556] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[WARN] [1777781343.203143485] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0
+[WARN] [1777781346.314030109] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0
+[WARN] [1777781350.152823632] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=0
+[WARN] [1777781351.259777609] [distinctiveTrajs]: base_point and control point are too close!, 2
+[WARN] [1777781352.802908027] [distinctiveTrajs]: base_point and control point are too close!
+[WARN] [1777781352.803270437] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[WARN] [1777781357.440354440] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=1, j=0
+[ERROR] [1777781357.442687164] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442712493] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442717478] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442732688] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442736251] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442739082] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442753266] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442757240] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442759974] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442773375] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442776590] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442780056] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442793217] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442796722] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442799372] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442812345] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442815502] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442818157] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442831280] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442834368] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442836889] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442849748] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442853351] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442855909] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442889146] [Coord2Index]: Ran out of pool, index=-1 67 57, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442893804] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442897302] [initControlPoints]: a star error, force return!
+[ERROR] [1777781357.442909427] [Coord2Index]: Ran out of pool, index=-1 67 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442912853] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442915396] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442929295] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442932817] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442935353] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442948619] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442964501] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442967227] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.442980447] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.442983600] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.442986136] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.443004823] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.443009879] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.443012978] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.443027061] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.443031006] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.443033543] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.443046765] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.443050283] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.443052930] [check_collision_and_rebound]: a star error
+[ERROR] [1777781357.443069858] [Coord2Index]: Ran out of pool, index=-1 66 58, POOL_SIZE=100 100 100
+[ERROR] [1777781357.443075328] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781357.443079012] [check_collision_and_rebound]: a star error
+[ERROR] [1777781358.454754781] [Coord2Index]: Ran out of pool, index=28 94 -1, POOL_SIZE=100 100 100
+[ERROR] [1777781358.454818457] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781358.454830547] [initControlPoints]: a star error, force return!
+[ERROR] [1777781359.454435475] [Coord2Index]: Ran out of pool, index=90 100 95, POOL_SIZE=100 100 100
+[ERROR] [1777781359.454488976] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781359.454501895] [initControlPoints]: a star error, force return!
+[ERROR] [1777781359.456883016] [Coord2Index]: Ran out of pool, index=100 46 73, POOL_SIZE=100 100 100
+[ERROR] [1777781359.456912034] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781359.456923432] [check_collision_and_rebound]: a star error
+[ERROR] [1777781359.456956797] [Coord2Index]: Ran out of pool, index=100 44 72, POOL_SIZE=100 100 100
+[ERROR] [1777781359.456965411] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781359.456972341] [check_collision_and_rebound]: a star error
+[ERROR] [1777781359.457000781] [Coord2Index]: Ran out of pool, index=100 46 73, POOL_SIZE=100 100 100
+[ERROR] [1777781359.457009183] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781359.457015937] [check_collision_and_rebound]: a star error

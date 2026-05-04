@@ -1,0 +1,14 @@
+{
+  "rows": 8,
+  "fusion_recall": 0.051917629113096525,
+  "fusion_f1": 0.09870992129443677,
+  "fusion_recall_gain_vs_best_single": 0.0003813466986271521,
+  "fusion_f1_gain_vs_best_single": 0.0006893612937472291,
+  "fusion_voxels": 1667.75,
+  "depth_recall": 0.0,
+  "lidar_recall": 0.051536282414469385,
+  "depth_f1": 0.0,
+  "lidar_f1": 0.09802056000068954,
+  "positive_ratio_recall_gain": 0.5,
+  "positive_ratio_f1_gain": 0.5
+}

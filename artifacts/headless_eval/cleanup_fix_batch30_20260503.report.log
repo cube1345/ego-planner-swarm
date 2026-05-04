@@ -1,0 +1,20 @@
+[INFO] [1777790326.947588522] [fusion_benefit_report]: fusion benefit report ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points fusion=/drone_0_fusion/fused_cloud global=/map_generator/global_cloud odom=/drone_0_visual_slam/odom
+[INFO] [1777790339.334769148] [fusion_benefit_report]: [fusion-benefit] window=20 recall(d/l/f)=0.088/0.101/0.169 f1(d/l/f)=0.162/0.183/0.288 gain_recall=+0.067 gain_f1=+0.104 union_recall=0.172
+[INFO] [1777790351.887400295] [fusion_benefit_report]: [fusion-benefit] window=40 recall(d/l/f)=0.089/0.100/0.170 f1(d/l/f)=0.164/0.181/0.290 gain_recall=+0.069 gain_f1=+0.108 union_recall=0.171
+[INFO] [1777790363.913578626] [fusion_benefit_report]: [fusion-benefit] window=60 recall(d/l/f)=0.088/0.098/0.167 f1(d/l/f)=0.162/0.178/0.286 gain_recall=+0.069 gain_f1=+0.108 union_recall=0.168
+Traceback (most recent call last):
+  File "/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/fusion_benefit_report.py", line 317, in <module>
+    main()
+  File "/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/fusion_benefit_report.py", line 307, in main
+    rclpy.spin(node)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 229, in spin
+    executor.spin_once()
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 808, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 797, in _spin_once_impl
+    handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 780, in wait_for_ready_callbacks
+    return next(self._cb_iter)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 653, in _wait_for_ready_callbacks
+    wait_set = _rclpy.WaitSet(
+rclpy._rclpy_pybind11.RCLError: failed to initialize wait set: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/wait.c:130

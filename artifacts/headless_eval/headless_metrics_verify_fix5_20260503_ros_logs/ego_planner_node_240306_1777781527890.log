@@ -1,0 +1,21 @@
+[INFO] [1777781527.997985525] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777781529.209589608] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[ERROR] [1777781532.741764627] [Coord2Index]: Ran out of pool, index=-1 69 56, POOL_SIZE=100 100 100
+[ERROR] [1777781532.741814931] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781532.741826088] [check_collision_and_rebound]: a star error
+[ERROR] [1777781532.741860712] [Coord2Index]: Ran out of pool, index=-1 69 56, POOL_SIZE=100 100 100
+[ERROR] [1777781532.741869433] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781532.741876178] [check_collision_and_rebound]: a star error
+[WARN] [1777781536.390454166] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=1
+[ERROR] [1777781539.640527968] [Coord2Index]: Ran out of pool, index=-1 84 85, POOL_SIZE=100 100 100
+[ERROR] [1777781539.640634771] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781539.640652030] [initControlPoints]: a star error, force return!
+[WARN] [1777781543.842936929] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.184041
+[WARN] [1777781543.849401809] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.187647
+[WARN] [1777781547.542655022] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=1, j=2
+[ERROR] [1777781548.245258080] [Coord2Index]: Ran out of pool, index=-1 29 96, POOL_SIZE=100 100 100
+[ERROR] [1777781548.245309161] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781548.245324391] [check_collision_and_rebound]: a star error
+[ERROR] [1777781548.245386555] [Coord2Index]: Ran out of pool, index=-1 32 97, POOL_SIZE=100 100 100
+[ERROR] [1777781548.245397364] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781548.245405782] [initControlPoints]: a star error, force return!

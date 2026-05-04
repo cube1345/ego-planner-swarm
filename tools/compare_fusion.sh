@@ -12,10 +12,16 @@ WINDOW_SIZE=80
 REPORT_EVERY=20
 USE_MOCKAMAP="True"
 MIN_PROBABILITY="0.30"
+MIN_HITS="1"
 ADAPTIVE_ENABLE="True"
 ADAPTIVE_MIN="0.20"
 ADAPTIVE_MAX="0.35"
 ADAPTIVE_STEP="0.02"
+NEAR_FIELD_RADIUS="4.0"
+LIDAR_GROWTH="5.0"
+ADAPTIVE_MIN_HITS_ENABLE="True"
+ADAPTIVE_MIN_HITS_MIN="1"
+ADAPTIVE_MIN_HITS_MAX="3"
 ADAPTIVE_EVAL_RANGE="10.0"
 ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
@@ -39,10 +45,16 @@ Usage: bash tools/compare_fusion.sh [options]
   --report-every N
   --use-mockamap True|False
   --min-probability FLOAT
+  --min-hits INT
   --adaptive-enable True|False
   --adaptive-min FLOAT
   --adaptive-max FLOAT
   --adaptive-step FLOAT
+  --near-field-radius FLOAT
+  --lidar-growth FLOAT
+  --adaptive-min-hits-enable True|False
+  --adaptive-min-hits-min INT
+  --adaptive-min-hits-max INT
   --adaptive-eval-range FLOAT
   --adaptive-min-gt-voxels INT
   --adaptive-score-alpha FLOAT
@@ -66,10 +78,16 @@ while [[ $# -gt 0 ]]; do
     --report-every) REPORT_EVERY="$2"; shift 2 ;;
     --use-mockamap) USE_MOCKAMAP="$2"; shift 2 ;;
     --min-probability) MIN_PROBABILITY="$2"; shift 2 ;;
+    --min-hits) MIN_HITS="$2"; shift 2 ;;
     --adaptive-enable) ADAPTIVE_ENABLE="$2"; shift 2 ;;
     --adaptive-min) ADAPTIVE_MIN="$2"; shift 2 ;;
     --adaptive-max) ADAPTIVE_MAX="$2"; shift 2 ;;
     --adaptive-step) ADAPTIVE_STEP="$2"; shift 2 ;;
+    --near-field-radius) NEAR_FIELD_RADIUS="$2"; shift 2 ;;
+    --lidar-growth) LIDAR_GROWTH="$2"; shift 2 ;;
+    --adaptive-min-hits-enable) ADAPTIVE_MIN_HITS_ENABLE="$2"; shift 2 ;;
+    --adaptive-min-hits-min) ADAPTIVE_MIN_HITS_MIN="$2"; shift 2 ;;
+    --adaptive-min-hits-max) ADAPTIVE_MIN_HITS_MAX="$2"; shift 2 ;;
     --adaptive-eval-range) ADAPTIVE_EVAL_RANGE="$2"; shift 2 ;;
     --adaptive-min-gt-voxels) ADAPTIVE_MIN_GT_VOXELS="$2"; shift 2 ;;
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
@@ -98,6 +116,12 @@ REPORT_LOG="$OUT_DIR/${LABEL}.report.log"
 RUN_LOG_DIR="$OUT_DIR/${LABEL}_ros_logs"
 SIM_STATS_DIR="$OUT_DIR/${LABEL}_sim_stats"
 SIM_STATS_LOG="$OUT_DIR/${LABEL}.sim_stats.log"
+
+cleanup_existing_ros_processes() {
+  pkill -TERM -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
+  sleep 2
+  pkill -KILL -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
+}
 
 stop_pid() {
   local pid="$1"
@@ -138,11 +162,10 @@ cleanup() {
   if [[ -n "${LAUNCH_PID:-}" ]]; then
     stop_pid "$LAUNCH_PID"
   fi
-  pkill -TERM -f 'single_run_in_sim_fusion.launch.py' 2>/dev/null || true
   pkill -TERM -f 'fusion_benefit_report.py' 2>/dev/null || true
   sleep 1
-  pkill -KILL -f 'single_run_in_sim_fusion.launch.py' 2>/dev/null || true
   pkill -KILL -f 'fusion_benefit_report.py' 2>/dev/null || true
+  cleanup_existing_ros_processes
 }
 
 trap cleanup EXIT
@@ -150,6 +173,8 @@ trap cleanup EXIT
 set +u
 source install/setup.bash
 set -u
+
+cleanup_existing_ros_processes
 
 rm -f "$CSV_PATH" "$SUMMARY_PATH" "$LAUNCH_LOG" "$REPORT_LOG" "$SIM_STATS_LOG"
 rm -rf "$SIM_STATS_DIR"
@@ -169,11 +194,17 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   point0_x:="$POINT0_X" \
   point0_y:="$POINT0_Y" \
   point0_z:="$POINT0_Z" \
+  near_field_radius:="$NEAR_FIELD_RADIUS" \
+  lidar_growth:="$LIDAR_GROWTH" \
   min_probability:="$MIN_PROBABILITY" \
+  min_hits:="$MIN_HITS" \
   adaptive_min_probability_enable:="$ADAPTIVE_ENABLE" \
   adaptive_min_probability_min:="$ADAPTIVE_MIN" \
   adaptive_min_probability_max:="$ADAPTIVE_MAX" \
   adaptive_min_probability_step:="$ADAPTIVE_STEP" \
+  adaptive_min_hits_enable:="$ADAPTIVE_MIN_HITS_ENABLE" \
+  adaptive_min_hits_min:="$ADAPTIVE_MIN_HITS_MIN" \
+  adaptive_min_hits_max:="$ADAPTIVE_MIN_HITS_MAX" \
   adaptive_eval_range:="$ADAPTIVE_EVAL_RANGE" \
   adaptive_min_gt_voxels:="$ADAPTIVE_MIN_GT_VOXELS" \
   adaptive_score_alpha:="$ADAPTIVE_SCORE_ALPHA" \

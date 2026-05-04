@@ -186,6 +186,11 @@ namespace ego_planner
   void EGOReplanFSM::planNextWaypoint(const Eigen::Vector3d next_wp)
   {
     bool success = false;
+    RCLCPP_INFO(
+        node_->get_logger(),
+        "planNextWaypoint odom=(%.2f, %.2f, %.2f) next_wp=(%.2f, %.2f, %.2f)",
+        odom_pos_(0), odom_pos_(1), odom_pos_(2),
+        next_wp(0), next_wp(1), next_wp(2));
     success = planner_manager_->planGlobalTraj(odom_pos_, odom_vel_, Eigen::Vector3d::Zero(), next_wp, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
     if (success)

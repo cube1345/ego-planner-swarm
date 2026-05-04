@@ -1,0 +1,6 @@
+[INFO] [1777786824.607241629] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777786825.928035231] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[WARN] [1777786825.997634798] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=2
+[WARN] [1777786826.007870989] [rebound_optimize]: Solver error. Return = -1008, A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions.. Skip this planning.
+[ERROR] [1777786826.012538204] [refine_optimize]: Solver error in refining!, return = -1008, A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions.
+[WARN] [1777786826.022018122] [rebound_optimize]: Solver error. Return = -1008, A rounding error occurred; alternatively, no line-search step satisfies the sufficient decrease and curvature conditions.. Skip this planning.

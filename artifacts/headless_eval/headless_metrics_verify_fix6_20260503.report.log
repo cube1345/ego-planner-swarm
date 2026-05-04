@@ -1,0 +1,4 @@
+[INFO] [1777781611.921535061] [fusion_benefit_report]: fusion benefit report ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points fusion=/drone_0_fusion/fused_cloud global=/map_generator/global_cloud odom=/drone_0_visual_slam/odom
+[INFO] [1777781617.819335459] [fusion_benefit_report]: [fusion-benefit] window=10 recall(d/l/f)=0.107/0.106/0.184 f1(d/l/f)=0.193/0.192/0.310 gain_recall=+0.068 gain_f1=+0.103 union_recall=0.192
+[INFO] [1777781623.311439804] [fusion_benefit_report]: [fusion-benefit] window=20 recall(d/l/f)=0.090/0.101/0.170 f1(d/l/f)=0.164/0.183/0.290 gain_recall=+0.064 gain_f1=+0.099 union_recall=0.171
+[INFO] [1777781628.025470937] [fusion_benefit_report]: [fusion-benefit] window=20 recall(d/l/f)=0.076/0.097/0.151 f1(d/l/f)=0.141/0.177/0.262 gain_recall=+0.054 gain_f1=+0.085 union_recall=0.156

@@ -1,0 +1,4289 @@
+diff --git a/src/planner/bspline_opt/include/bspline_opt/uniform_bspline.h b/src/planner/bspline_opt/include/bspline_opt/uniform_bspline.h
+index 0f781ff..e6fb125 100755
+--- a/src/planner/bspline_opt/include/bspline_opt/uniform_bspline.h
++++ b/src/planner/bspline_opt/include/bspline_opt/uniform_bspline.h
+@@ -1,11 +1,12 @@
+ #ifndef _UNIFORM_BSPLINE_H_
+ #define _UNIFORM_BSPLINE_H_
+ 
+-#include <Eigen/Eigen>
+-#include <algorithm>
+-#include <iostream>
+-
+-using namespace std;
++#include <Eigen/Eigen>
++#include <algorithm>
++#include <iostream>
++#include <traj_utils/eigen_types.hpp>
++
++using namespace std;
+ 
+ namespace ego_planner
+ {
+@@ -56,9 +57,9 @@ namespace ego_planner
+     // constraints
+     // input : (K+2) points with boundary vel/acc; ts
+     // output: (K+6) control_pts
+-    static void parameterizeToBspline(const double &ts, const vector<Eigen::Vector3d> &point_set,
+-                                      const vector<Eigen::Vector3d> &start_end_derivative,
+-                                      Eigen::MatrixXd &ctrl_pts);
++    static void parameterizeToBspline(const double &ts, const Vec3dList &point_set,
++                                      const Vec3dList &start_end_derivative,
++                                      Eigen::MatrixXd &ctrl_pts);
+ 
+     /* check feasibility, adjust time */
+ 
+@@ -77,4 +78,4 @@ namespace ego_planner
+     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+   };
+ } // namespace ego_planner
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/src/planner/bspline_opt/src/uniform_bspline.cpp b/src/planner/bspline_opt/src/uniform_bspline.cpp
+index d21404c..d723255 100755
+--- a/src/planner/bspline_opt/src/uniform_bspline.cpp
++++ b/src/planner/bspline_opt/src/uniform_bspline.cpp
+@@ -208,9 +208,9 @@ namespace ego_planner
+   // void UniformBspline::recomputeInit() {}
+ 
+   // 将一组点转换为控制点
+-  void UniformBspline::parameterizeToBspline(const double &ts, const vector<Eigen::Vector3d> &point_set,
+-                                             const vector<Eigen::Vector3d> &start_end_derivative,
+-                                             Eigen::MatrixXd &ctrl_pts)
++  void UniformBspline::parameterizeToBspline(const double &ts, const Vec3dList &point_set,
++                                             const Vec3dList &start_end_derivative,
++                                             Eigen::MatrixXd &ctrl_pts)
+   {
+     if (ts <= 0)
+     {
+diff --git a/src/planner/plan_manage/include/ego_planner/ego_replan_fsm.h b/src/planner/plan_manage/include/ego_planner/ego_replan_fsm.h
+index ed91462..da95924 100755
+--- a/src/planner/plan_manage/include/ego_planner/ego_replan_fsm.h
++++ b/src/planner/plan_manage/include/ego_planner/ego_replan_fsm.h
+@@ -17,9 +17,10 @@
+ #include "traj_utils/msg/bspline.hpp"
+ #include "traj_utils/msg/multi_bsplines.hpp"
+ #include "geometry_msgs/msg/pose_stamped.hpp"
+-#include "traj_utils/msg/data_disp.hpp"
+-#include "ego_planner/planner_manager.h"
+-#include "traj_utils/planning_visualization.h"
++#include "traj_utils/msg/data_disp.hpp"
++#include "traj_utils/eigen_types.hpp"
++#include "ego_planner/planner_manager.h"
++#include "traj_utils/planning_visualization.h"
+ 
+ using std::vector;
+ 
+@@ -75,7 +76,7 @@ namespace ego_planner
+     Eigen::Vector3d init_pt_, start_pt_, start_vel_, start_acc_, start_yaw_; // start state
+     Eigen::Vector3d end_pt_, end_vel_;                                       // goal state
+     Eigen::Vector3d local_target_pt_, local_target_vel_;                     // local target state
+-    std::vector<Eigen::Vector3d> wps_;
++    Vec3dList wps_;
+     int current_wp_;
+ 
+     bool flag_escape_emergency_;
+@@ -139,4 +140,4 @@ namespace ego_planner
+ 
+ } // namespace ego_planner
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/src/planner/plan_manage/include/ego_planner/planner_manager.h b/src/planner/plan_manage/include/ego_planner/planner_manager.h
+index 74b6178..2148314 100755
+--- a/src/planner/plan_manage/include/ego_planner/planner_manager.h
++++ b/src/planner/plan_manage/include/ego_planner/planner_manager.h
+@@ -6,11 +6,12 @@
+ #include <bspline_opt/bspline_optimizer.h>
+ #include <bspline_opt/uniform_bspline.h>
+ #include <traj_utils/msg/data_disp.hpp>
+-#include <plan_env/grid_map.h>
+-#include <plan_env/obj_predictor.h>
+-#include <traj_utils/plan_container.hpp>
+-#include <rclcpp/rclcpp.hpp>
+-#include <traj_utils/planning_visualization.h>
++#include <plan_env/grid_map.h>
++#include <plan_env/obj_predictor.h>
++#include <traj_utils/plan_container.hpp>
++#include <traj_utils/eigen_types.hpp>
++#include <rclcpp/rclcpp.hpp>
++#include <traj_utils/planning_visualization.h>
+ 
+ namespace ego_planner
+ {
+@@ -30,11 +31,11 @@ namespace ego_planner
+     /* main planning interface */
+     bool reboundReplan(Eigen::Vector3d start_pt, Eigen::Vector3d start_vel, Eigen::Vector3d start_acc,
+                        Eigen::Vector3d end_pt, Eigen::Vector3d end_vel, bool flag_polyInit, bool flag_randomPolyTraj);
+-    bool EmergencyStop(Eigen::Vector3d stop_pos);
+-    bool planGlobalTraj(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
+-                        const Eigen::Vector3d &end_pos, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
+-    bool planGlobalTrajWaypoints(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
+-                                 const std::vector<Eigen::Vector3d> &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
++    bool EmergencyStop(Eigen::Vector3d stop_pos);
++    bool planGlobalTraj(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
++                        const Eigen::Vector3d &end_pos, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
++    bool planGlobalTrajWaypoints(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
++                                 const Vec3dList &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc);
+ 
+     void initPlanModules(rclcpp::Node::SharedPtr &node, PlanningVisualization::Ptr vis = NULL);
+ 
+@@ -66,10 +67,10 @@ namespace ego_planner
+ 
+     void updateTrajInfo(const UniformBspline &position_traj, const rclcpp::Time time_now);
+ 
+-    void reparamBspline(UniformBspline &bspline, vector<Eigen::Vector3d> &start_end_derivative, double ratio, Eigen::MatrixXd &ctrl_pts, double &dt,
+-                        double &time_inc);
+-
+-    bool refineTrajAlgo(UniformBspline &traj, vector<Eigen::Vector3d> &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points);
++    void reparamBspline(UniformBspline &bspline, Vec3dList &start_end_derivative, double ratio, Eigen::MatrixXd &ctrl_pts, double &dt,
++                        double &time_inc);
++
++    bool refineTrajAlgo(UniformBspline &traj, Vec3dList &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points);
+ 
+     // !SECTION stable
+ 
+@@ -82,4 +83,4 @@ namespace ego_planner
+   };
+ } // namespace ego_planner
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/src/planner/plan_manage/launch/default.rviz b/src/planner/plan_manage/launch/default.rviz
+old mode 100755
+new mode 100644
+index b97c31b..04eb6cf
+--- a/src/planner/plan_manage/launch/default.rviz
++++ b/src/planner/plan_manage/launch/default.rviz
+@@ -5,87 +5,13 @@ Panels:
+     Property Tree Widget:
+       Expanded:
+         - /Global Options1
+-        - /Status1
+-        - /simulation_map1/Topic1
+-        - /drone01/Planning1/goal_point1
+-        - /drone01/Planning1/global_path1
+-        - /drone01/Planning1/optimal_traj1
+-        - /drone01/Planning1/AStar1
+-        - /drone01/Planning1/InitTraj1
+-        - /drone01/Planning1/drone_path1
+-        - /drone01/Mapping1/map inflate1
+-        - /drone01/Simulation1/depth1
+-        - /drone11
+-        - /drone11/Planning1/goal_point1
+-        - /drone11/Planning1/global_path1
+-        - /drone11/Planning1/optimal_traj1
+-        - /drone11/Planning1/AStar1
+-        - /drone11/Planning1/InitTraj1
+-        - /drone11/Planning1/drone_path1
+-        - /drone11/Mapping1
+-        - /drone11/Mapping1/map inflate1
+-        - /drone11/Simulation1/robot1
+-        - /drone11/Simulation1/depth1
+-        - /drone21/Planning1
+-        - /drone21/Mapping1
+-        - /drone21/Simulation1
+-        - /drone21/Simulation1/depth1
+-        - /drone31/Mapping1/map inflate1
+-        - /drone31/Simulation1/depth1
+-        - /drone31/Simulation1/depth1/Topic1
+-        - /drone41/Mapping1/map inflate1
+-        - /drone41/Simulation1
+-        - /drone41/Simulation1/robot1
+-        - /drone41/Simulation1/depth1
+-        - /drone51/Mapping1/map inflate1
+-        - /drone51/Simulation1/robot1
+-        - /drone51/Simulation1/depth1
+-        - /drone61/Planning1/drone_path1
+-        - /drone61/Simulation1/robot1
+-        - /drone61/Simulation1/depth1
+-        - /drone81/Mapping1/map inflate1
+-        - /drone91/Mapping1/map inflate1
+-        - /drone91/Simulation1
+-        - /drone91/Simulation1/depth1
+-        - /drone101/Planning1/optimal_traj1
+-        - /drone101/Mapping1
+-        - /drone101/Simulation1/robot1
+-        - /drone111/Simulation1
+-        - /drone111/Simulation1/depth1
+-        - /drone121/Simulation1/depth1
+-        - /drone131/Planning1
+-        - /drone131/Mapping1/map inflate1
+-        - /drone131/Simulation1/robot1
+-        - /drone131/Simulation1/depth1
+-        - /drone141/Mapping1/map inflate1
+-        - /drone141/Simulation1/robot1
+-        - /drone141/Simulation1/depth1
+-        - /drone151/Planning1
+-        - /drone151/Mapping1
+-        - /drone151/Simulation1
+-        - /drone161/Planning1
+-        - /drone161/Planning1/goal_point1
+-        - /drone161/Planning1/global_path1
+-        - /drone161/Mapping1/map inflate1
+-        - /drone161/Simulation1/robot1
+-        - /drone161/Simulation1/depth1
+-        - /drone171/Simulation1/robot1
+-        - /drone171/Simulation1/depth1
+-        - /drone181/Planning1
+-        - /drone181/Planning1/drone_path1
+-        - /drone181/Mapping1
+-        - /drone181/Mapping1/map inflate1
+-        - /drone181/Simulation1
+-        - /drone181/Simulation1/robot1
+-        - /drone181/Simulation1/depth1
+-        - /drone191/Planning1
+-        - /drone191/Mapping1
+-        - /drone191/Mapping1/map inflate1
+-        - /drone191/Simulation1/robot1
+-        - /drone201/Simulation1/robot1
+-        - /drone201/Simulation1/depth1
++        - /simulation_map1
++        - /drone01
++        - /drone01/Planning1
++        - /drone01/Mapping1
++        - /drone01/Simulation1
+       Splitter Ratio: 0.5
+-    Tree Height: 1239
++    Tree Height: 900
+   - Class: rviz_common/Selection
+     Name: Selection
+   - Class: rviz_common/Tool Properties
+@@ -97,7 +23,6 @@ Panels:
+   - Class: rviz_common/Views
+     Expanded:
+       - /Current View1
+-      - /Current View1/Focal Point1
+     Name: Views
+     Splitter Ratio: 0.5
+   - Class: rviz_common/Time
+@@ -108,7 +33,7 @@ Panels:
+ Visualization Manager:
+   Class: ""
+   Displays:
+-    - Alpha: 0.5
++    - Alpha: 0.35
+       Cell Size: 1
+       Class: rviz_default_plugins/Grid
+       Color: 160; 160; 164
+@@ -123,19 +48,19 @@ Visualization Manager:
+         Y: 0
+         Z: 0
+       Plane: XY
+-      Plane Cell Count: 1000
+-      Reference Frame: <Fixed Frame>
++      Plane Cell Count: 80
++      Reference Frame: world
+       Value: true
+-    - Alpha: 0.15000000596046448
++    - Alpha: 0.12
+       Autocompute Intensity Bounds: true
+       Autocompute Value Bounds:
+-        Max Value: 2.9000000953674316
++        Max Value: 3
+         Min Value: 0
+         Value: true
+       Axis: Z
+       Channel Name: intensity
+       Class: rviz_default_plugins/PointCloud2
+-      Color: 85; 170; 255
++      Color: 170; 170; 170
+       Color Transformer: FlatColor
+       Decay Time: 0
+       Enabled: true
+@@ -147,8 +72,8 @@ Visualization Manager:
+       Name: simulation_map
+       Position Transformer: XYZ
+       Selectable: true
+-      Size (Pixels): 3
+-      Size (m): 0.10000000149011612
++      Size (Pixels): 2
++      Size (m): 0.07000000029802322
+       Style: Flat Squares
+       Topic:
+         Depth: 5
+@@ -158,3244 +83,14 @@ Visualization Manager:
+         Reliability Policy: Reliable
+         Value: /map_generator/global_cloud
+       Use Fixed Frame: true
+-      Use rainbow: true
++      Use rainbow: false
+       Value: true
+     - Class: rviz_common/Group
+       Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 29; 108; 212
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 29; 108; 212
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_0_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone0
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 255; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 255; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_1_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone1
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone2
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_plan_vis/a_star_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 0; 255
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 0; 255
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_3_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone3
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 0; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 0; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_4_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone4
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 255; 0; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 255; 0; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_5_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone5
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 190; 120; 121
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 190; 120; 121
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_6_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone6
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 0; 170; 255
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 0; 170; 255
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_7_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_2_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone7
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 226; 0; 158
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 226; 0; 158
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_8_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone8
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 85; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 85; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_9_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone9
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 29; 108; 212
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 29; 108; 212
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_10_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone10
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 255; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 255; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_11_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone11
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_12_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone12
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 0; 255
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 0; 255
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_13_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone13
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 0; 170; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 0; 170; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_14_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone14
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 255; 0; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 255; 0; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_15_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone15
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 190; 120; 121
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 190; 120; 121
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_16_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone16
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 0; 170; 255
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 0; 170; 255
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_17_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone17
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 226; 0; 158
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 226; 0; 158
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
+-              Value: true
+-          Enabled: true
+-          Name: Mapping
+         - Class: rviz_common/Group
+           Displays:
+             - Class: rviz_default_plugins/Marker
+               Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_18_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone18
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+               Name: goal_point
+               Namespaces:
+                 {}
+@@ -3405,180 +100,10 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_19_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: global_path
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_plan_vis/global_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: true
+-              Name: optimal_traj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_plan_vis/optimal_list
+-              Value: true
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: AStar
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_plan_vis/a_star_list
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: InitTraj
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_plan_vis/init_list
+-              Value: false
+-            - Alpha: 1
+-              Buffer Length: 1
+-              Class: rviz_default_plugins/Path
+-              Color: 170; 85; 0
+-              Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
+-              Length: 0.30000001192092896
+-              Line Style: Billboards
+-              Line Width: 0.10000000149011612
+-              Name: drone_path
+-              Offset:
+-                X: 0
+-                Y: 0
+-                Z: 0
+-              Pose Color: 255; 85; 255
+-              Pose Style: None
+-              Radius: 0.029999999329447746
+-              Shaft Diameter: 0.10000000149011612
+-              Shaft Length: 0.10000000149011612
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_vis/path
+-              Value: true
+-          Enabled: true
+-          Name: Planning
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Alpha: 1
+-              Autocompute Intensity Bounds: true
+-              Autocompute Value Bounds:
+-                Max Value: 10
+-                Min Value: -10
+-                Value: true
+-              Axis: Z
+-              Channel Name: intensity
+-              Class: rviz_default_plugins/PointCloud2
+-              Color: 170; 85; 0
+-              Color Transformer: FlatColor
+-              Decay Time: 0
+-              Enabled: true
+-              Invert Rainbow: false
+-              Max Color: 255; 255; 255
+-              Max Intensity: 4096
+-              Min Color: 0; 0; 0
+-              Min Intensity: 0
+-              Name: map inflate
+-              Position Transformer: XYZ
+-              Selectable: true
+-              Size (Pixels): 3
+-              Size (m): 0.10000000149011612
+-              Style: Flat Squares
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_grid/grid_map/occupancy_inflate
+-              Use Fixed Frame: true
+-              Use rainbow: true
++                Value: /drone_0_plan_vis/goal_point
+               Value: true
+-          Enabled: true
+-          Name: Mapping
+-        - Class: rviz_common/Group
+-          Displays:
+             - Class: rviz_default_plugins/Marker
+               Enabled: true
+-              Name: robot
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_vis/robot
+-              Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_19_pcl_render_node/depth
+-              Value: false
+-          Enabled: true
+-          Name: Simulation
+-      Enabled: true
+-      Name: drone19
+-    - Class: rviz_common/Group
+-      Displays:
+-        - Class: rviz_common/Group
+-          Displays:
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+-              Name: goal_point
+-              Namespaces:
+-                {}
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                Filter size: 10
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_20_plan_vis/goal_point
+-              Value: false
+-            - Class: rviz_default_plugins/Marker
+-              Enabled: false
+               Name: global_path
+               Namespaces:
+                 {}
+@@ -3588,8 +113,8 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_plan_vis/global_list
+-              Value: false
++                Value: /drone_0_plan_vis/global_list
++              Value: true
+             - Class: rviz_default_plugins/Marker
+               Enabled: true
+               Name: optimal_traj
+@@ -3601,7 +126,7 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_plan_vis/optimal_list
++                Value: /drone_0_plan_vis/optimal_list
+               Value: true
+             - Class: rviz_default_plugins/Marker
+               Enabled: false
+@@ -3614,7 +139,7 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_plan_vis/a_star_list
++                Value: /drone_0_plan_vis/a_star_list
+               Value: false
+             - Class: rviz_default_plugins/Marker
+               Enabled: false
+@@ -3627,18 +152,18 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_plan_vis/init_list
++                Value: /drone_0_plan_vis/init_list
+               Value: false
+             - Alpha: 1
+-              Buffer Length: 1
++              Buffer Length: 400
+               Class: rviz_default_plugins/Path
+-              Color: 20; 106; 172
++              Color: 20; 120; 220
+               Enabled: true
+-              Head Diameter: 0.30000001192092896
+-              Head Length: 0.20000000298023224
++              Head Diameter: 0.15000000596046448
++              Head Length: 0.10000000149011612
+               Length: 0.30000001192092896
+               Line Style: Billboards
+-              Line Width: 0.10000000149011612
++              Line Width: 0.07000000029802322
+               Name: drone_path
+               Offset:
+                 X: 0
+@@ -3655,13 +180,13 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_vis/path
++                Value: /drone_0_vis/path
+               Value: true
+           Enabled: true
+           Name: Planning
+         - Class: rviz_common/Group
+           Displays:
+-            - Alpha: 1
++            - Alpha: 0.9
+               Autocompute Intensity Bounds: true
+               Autocompute Value Bounds:
+                 Max Value: 10
+@@ -3670,7 +195,7 @@ Visualization Manager:
+               Axis: Z
+               Channel Name: intensity
+               Class: rviz_default_plugins/PointCloud2
+-              Color: 20; 106; 172
++              Color: 255; 80; 80
+               Color Transformer: FlatColor
+               Decay Time: 0
+               Enabled: true
+@@ -3679,7 +204,7 @@ Visualization Manager:
+               Max Intensity: 4096
+               Min Color: 0; 0; 0
+               Min Intensity: 0
+-              Name: map inflate
++              Name: map_inflate
+               Position Transformer: XYZ
+               Selectable: true
+               Size (Pixels): 3
+@@ -3691,9 +216,9 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_grid/grid_map/occupancy_inflate
++                Value: /drone_0_grid/grid_map/occupancy_inflate
+               Use Fixed Frame: true
+-              Use rainbow: true
++              Use rainbow: false
+               Value: true
+           Enabled: true
+           Name: Mapping
+@@ -3710,29 +235,15 @@ Visualization Manager:
+                 Filter size: 10
+                 History Policy: Keep Last
+                 Reliability Policy: Reliable
+-                Value: /drone_20_vis/robot
++                Value: /drone_0_vis/robot
+               Value: true
+-            - Class: rviz_default_plugins/Image
+-              Enabled: false
+-              Max Value: 1
+-              Median window: 5
+-              Min Value: 0
+-              Name: depth
+-              Normalize Range: true
+-              Topic:
+-                Depth: 5
+-                Durability Policy: Volatile
+-                History Policy: Keep Last
+-                Reliability Policy: Reliable
+-                Value: /drone_20_pcl_render_node/depth
+-              Value: false
+           Enabled: true
+           Name: Simulation
+       Enabled: true
+-      Name: drone20
++      Name: drone0
+   Enabled: true
+   Global Options:
+-    Background Color: 255; 255; 255
++    Background Color: 245; 245; 245
+     Fixed Frame: world
+     Frame Rate: 30
+   Name: root
+@@ -3776,7 +287,7 @@ Visualization Manager:
+   Views:
+     Current:
+       Class: rviz_default_plugins/Orbit
+-      Distance: 72.86026000976562
++      Distance: 33.0
+       Enable Stereo Rendering:
+         Stereo Eye Separation: 0.05999999865889549
+         Stereo Focal Distance: 1
+@@ -3785,24 +296,21 @@ Visualization Manager:
+       Focal Point:
+         X: 0
+         Y: 0
+-        Z: 0
+-      Focal Shape Fixed Size: false
+-      Focal Shape Size: 0.05000000074505806
++        Z: 1
+       Invert Z Axis: false
+       Name: Current View
+       Near Clip Distance: 0.009999999776482582
+-      Pitch: 1.5697963237762451
+-      Target Frame: <Fixed Frame>
++      Pitch: 0.699999988079071
++      Target Frame: world
+       Value: Orbit (rviz)
+-      Yaw: 3.1575729846954346
+-    Saved: ~
++      Yaw: 4.699999809265137
+ Window Geometry:
+   Displays:
+     collapsed: false
+-  Height: 1536
++  Height: 1200
+   Hide Left Dock: false
+   Hide Right Dock: false
+-  QMainWindow State: 000000ff00000000fd00000004000000000000031c00000562fc0200000032fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed0000023000000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000562000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000002270000005c0000000000000000fb0000000a00640065007000740068000000024e000000640000000000000000fb0000000a00640065007000740068000000027b0000006e0000000000000000fb0000000a00640065007000740068000000052c0000006c0000000000000000fb0000000a006400650070007400680000000521000000770000000000000000fb0000000a006400650070007400680000000514000000840000000000000000fb0000000a006400650070007400680000000505000000930000000000000000fb0000000a0064006500700074006800000004f4000000a40000000000000000fb0000000a0064006500700074006800000004db000000bd0000000000000000fb0000000a006400650070007400680000000523000000750000000000000000fb0000000a006400650070007400680000000502000000960000000000000000fb0000000a006400650070007400680000000718000000d00000000000000000fb0000000a0064006500700074006800000006c90000011f0000000000000000fb0000000a006400650070007400680000000723000000c50000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a0064006500700074006800000004bc000000dc0000000000000000fb0000000a00640065007000740068000000013c000000300000002800fffffffb0000000a006400650070007400680000000147000000320000002800fffffffb0000000a006400650070007400680000000153000000340000002800fffffffb0000000a006400650070007400680000000160000000390000002800fffffffb0000000a00640065007000740068000000016f000000380000002800fffffffb0000000a00640065007000740068000000017e0000003c0000002800fffffffb0000000a00640065007000740068000000018f0000003f0000002800fffffffb0000000a0064006500700074006800000001a2000000450000002800fffffffb0000000a0064006500700074006800000001b7000000470000002800fffffffb0000000a0064006500700074006800000004bc000000e30000002800fffffffb0000000a0064006500700074006800000004e5000000ba0000002800fffffffb0000000a0064006500700074006800000004fa000000a50000002800fffffffb0000000a00640065007000740068000000050e000000910000002800fffffffb0000000a006400650070007400680000000517000000880000002800fffffffb0000000a00640065007000740068000000052c000000730000002800fffffffb0000000a0064006500700074006800000005330000006c0000002800fffffffb0000000a0064006500700074006800000005340000006b0000002800fffffffb0000000a006400650070007400680000000547000000580000002800fffffffb0000000a0064006500700074006800000005450000005a0000002800fffffffb0000000a00640065007000740068000000054f000000500000002800fffffffb0000000a0064006500700074006800000005520000004d0000002800ffffff000000010000010f00000562fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d00000562000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000009aa0000003efc0100000002fb0000000800540069006d00650100000000000009aa000002fb00fffffffb0000000800540069006d00650100000000000004500000000000000000000005730000056200000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
++  QMainWindow State: 000000ff00000000fd00000004000000000000020000042afc0200000008fb000000100044006900730070006c006100790073010000000000000269000000d700fffffffb0000001200530065006c0065006300740069006f006e000000026f0000005b0000005b00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007301000002d0000001d3000000b100fffffffb0000000a0056006900650077007301000004a900000181000000a600fffffffb0000000a0049006d0061006700650000000448000000b20000000000000000000000010000010f0000042afc0200000001fb0000000a00540069006d006501000000000000042a000002fa00ffffff0000028c0000042a00000004000000040000000800000008fc00000000
+   Selection:
+     collapsed: false
+   Time:
+@@ -3811,8 +319,6 @@ Window Geometry:
+     collapsed: false
+   Views:
+     collapsed: false
+-  Width: 2474
+-  X: 86
+-  Y: 587
+-  depth:
+-    collapsed: false
++  Width: 1920
++  X: 0
++  Y: 27
+diff --git a/src/planner/plan_manage/launch/single_run_in_sim.launch.py b/src/planner/plan_manage/launch/single_run_in_sim.launch.py
+index 2e29d63..fc702c2 100755
+--- a/src/planner/plan_manage/launch/single_run_in_sim.launch.py
++++ b/src/planner/plan_manage/launch/single_run_in_sim.launch.py
+@@ -187,4 +187,4 @@ def generate_launch_description():
+     ld.add_action(traj_server_node)
+     ld.add_action(simulator_include)
+ 
+-    return ld
+\ No newline at end of file
++    return ld
+diff --git a/src/planner/plan_manage/src/ego_replan_fsm.cpp b/src/planner/plan_manage/src/ego_replan_fsm.cpp
+index 78d5eee..9491478 100755
+--- a/src/planner/plan_manage/src/ego_replan_fsm.cpp
++++ b/src/planner/plan_manage/src/ego_replan_fsm.cpp
+@@ -194,7 +194,7 @@ namespace ego_planner
+ 
+       constexpr double step_size_t = 0.1;
+       int i_end = floor(planner_manager_->global_data_.global_duration_ / step_size_t);
+-      vector<Eigen::Vector3d> gloabl_traj(i_end);
++      Vec3dList gloabl_traj(i_end);
+       for (int i = 0; i < i_end; i++)
+       {
+         gloabl_traj[i] = planner_manager_->global_data_.global_traj_.evaluate(i * step_size_t);
+@@ -583,14 +583,15 @@ namespace ego_planner
+       {
+         if (t_cur > info->duration_ - 1e-2)
+         {
+-          have_target_ = false;
+-          have_trigger_ = false;
+-
+           if (target_type_ == TARGET_TYPE::PRESET_TARGET)
+           {
++            have_target_ = false;
+             wp_id_ = 0;
+             planNextWaypoint(wps_[wp_id_]);
++            goto force_return;
+           }
++          have_target_ = false;
++          have_trigger_ = false;
+ 
+           changeFSMExecState(WAIT_TARGET, "FSM");
+           goto force_return;
+diff --git a/src/planner/plan_manage/src/planner_manager.cpp b/src/planner/plan_manage/src/planner_manager.cpp
+index 2e420d4..36b7a17 100755
+--- a/src/planner/plan_manage/src/planner_manager.cpp
++++ b/src/planner/plan_manage/src/planner_manager.cpp
+@@ -68,7 +68,7 @@ namespace ego_planner
+     根据起始点和目标点的距离计算首个时间步长ts,向量的模大于0.1则用1.5倍否则用5倍
+     ***/
+     double ts = (start_pt - local_target_pt).norm() > 0.1 ? pp_.ctrl_pt_dist / pp_.max_vel_ * 1.5 : pp_.ctrl_pt_dist / pp_.max_vel_ * 5; // pp_.ctrl_pt_dist / pp_.max_vel_ is too tense, and will surely exceed the acc/vel limits
+-    vector<Eigen::Vector3d> point_set, start_end_derivatives;
++    Vec3dList point_set, start_end_derivatives;
+     static bool flag_first_call = true, flag_force_polynomial = false;
+     bool flag_regenerate = false;
+     do
+@@ -144,7 +144,7 @@ namespace ego_planner
+         double t_cur = (rclcpp::Clock().now() - local_data_.start_time_).seconds();
+ 
+         vector<double> pseudo_arc_length;
+-        vector<Eigen::Vector3d> segment_point;
++        Vec3dList segment_point;
+         pseudo_arc_length.push_back(0.0);
+         for (t = t_cur; t < local_data_.duration_ + 1e-3; t += ts)
+         {
+@@ -229,7 +229,7 @@ namespace ego_planner
+ 
+     /*** STEP 2: OPTIMIZE ***/
+     bool flag_step_1_success = false;
+-    vector<vector<Eigen::Vector3d>> vis_trajs;
++    Vec3dListList vis_trajs;
+ 
+     if (pp_.use_distinctive_trajs)
+     {
+@@ -386,12 +386,12 @@ namespace ego_planner
+   }
+ 
+   bool EGOPlannerManager::planGlobalTrajWaypoints(const Eigen::Vector3d &start_pos, const Eigen::Vector3d &start_vel, const Eigen::Vector3d &start_acc,
+-                                                  const std::vector<Eigen::Vector3d> &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc)
++                                                  const Vec3dList &waypoints, const Eigen::Vector3d &end_vel, const Eigen::Vector3d &end_acc)
+   {
+ 
+     // generate global reference trajectory
+ 
+-    vector<Eigen::Vector3d> points;
++    Vec3dList points;
+     points.push_back(start_pos);
+ 
+     for (size_t wp_i = 0; wp_i < waypoints.size(); wp_i++)
+@@ -407,7 +407,7 @@ namespace ego_planner
+     }
+ 
+     // insert intermediate points if too far
+-    vector<Eigen::Vector3d> inter_points;
++    Vec3dList inter_points;
+     double dist_thresh = max(total_len / 8, 4.0);
+ 
+     for (size_t i = 0; i < points.size() - 1; ++i)
+@@ -466,12 +466,12 @@ namespace ego_planner
+ 
+     // generate global reference trajectory
+ 
+-    vector<Eigen::Vector3d> points;
++    Vec3dList points;
+     points.push_back(start_pos);
+     points.push_back(end_pos);
+ 
+     // insert intermediate points if too far
+-    vector<Eigen::Vector3d> inter_points;
++    Vec3dList inter_points;
+     const double dist_thresh = 4.0;
+ 
+     for (size_t i = 0; i < points.size() - 1; ++i)
+@@ -527,7 +527,7 @@ namespace ego_planner
+     return true;
+   }
+ 
+-  bool EGOPlannerManager::refineTrajAlgo(UniformBspline &traj, vector<Eigen::Vector3d> &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points)
++  bool EGOPlannerManager::refineTrajAlgo(UniformBspline &traj, Vec3dList &start_end_derivative, double ratio, double &ts, Eigen::MatrixXd &optimal_control_points)
+   {
+     double t_inc;
+ 
+@@ -559,7 +559,7 @@ namespace ego_planner
+     local_data_.traj_id_ += 1;
+   }
+ 
+-  void EGOPlannerManager::reparamBspline(UniformBspline &bspline, vector<Eigen::Vector3d> &start_end_derivative, double ratio,
++  void EGOPlannerManager::reparamBspline(UniformBspline &bspline, Vec3dList &start_end_derivative, double ratio,
+                                          Eigen::MatrixXd &ctrl_pts, double &dt, double &time_inc)
+   {
+     double time_origin = bspline.getTimeSum();
+@@ -570,7 +570,7 @@ namespace ego_planner
+     dt = duration / double(seg_num);
+     time_inc = duration - time_origin;
+ 
+-    vector<Eigen::Vector3d> point_set;
++    Vec3dList point_set;
+     for (double time = 0.0; time <= duration + 1e-4; time += dt)
+     {
+       point_set.push_back(bspline.evaluateDeBoorT(time));
+diff --git a/src/planner/traj_utils/CMakeLists.txt b/src/planner/traj_utils/CMakeLists.txt
+index c77ef6e..3ebb814 100755
+--- a/src/planner/traj_utils/CMakeLists.txt
++++ b/src/planner/traj_utils/CMakeLists.txt
+@@ -61,14 +61,21 @@ add_library( traj_utils_lib SHARED
+ 
+ ament_target_dependencies(traj_utils_lib std_msgs geometry_msgs visualization_msgs rclcpp Eigen3 PCL)
+ 
++target_include_directories(traj_utils_lib PUBLIC
++  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
++  $<INSTALL_INTERFACE:include>
++)
++
+ install(TARGETS traj_utils_lib
++        EXPORT export_traj_utils_lib
+         DESTINATION lib
+ )
+ 
+ install(DIRECTORY include/${PROJECT_NAME}/
+-  DESTINATION include/${PROJECT_NAME}/${PROJECT_NAME}
++  DESTINATION include/${PROJECT_NAME}
+ )
+ 
++ament_export_targets(export_traj_utils_lib HAS_LIBRARY_TARGET)
+ ament_export_libraries(traj_utils_lib)
+ 
+ ament_package()
+diff --git a/src/planner/traj_utils/include/traj_utils/plan_container.hpp b/src/planner/traj_utils/include/traj_utils/plan_container.hpp
+index c2b5817..649e580 100755
+--- a/src/planner/traj_utils/include/traj_utils/plan_container.hpp
++++ b/src/planner/traj_utils/include/traj_utils/plan_container.hpp
+@@ -6,6 +6,7 @@
+ #include <rclcpp/rclcpp.hpp>
+ 
+ #include <bspline_opt/uniform_bspline.h>
++#include <traj_utils/eigen_types.hpp>
+ #include <traj_utils/polynomial_traj.h>
+ 
+ using std::vector;
+@@ -120,7 +121,7 @@ namespace ego_planner
+     // start_t: start time of the trajectory
+     // dist_pt: distance between the discretized points
+     void getTrajByRadius(const double &start_t, const double &des_radius, const double &dist_pt,
+-                         vector<Eigen::Vector3d> &point_set, vector<Eigen::Vector3d> &start_end_derivative,
++                         Vec3dList &point_set, Vec3dList &start_end_derivative,
+                          double &dt, double &seg_duration)
+     {
+       double seg_length = 0.0; // length of the truncated segment
+@@ -170,8 +171,8 @@ namespace ego_planner
+     // duration: time length of the segment
+     // seg_num: discretized the segment into *seg_num* parts
+     void getTrajByDuration(double start_t, double duration, int seg_num,
+-                           vector<Eigen::Vector3d> &point_set,
+-                           vector<Eigen::Vector3d> &start_end_derivative, double &dt)
++                           Vec3dList &point_set,
++                           Vec3dList &start_end_derivative, double &dt)
+     {
+       dt = duration / seg_num;
+       Eigen::Vector3d cur_pt;
+@@ -230,4 +231,4 @@ namespace ego_planner
+ 
+ } // namespace ego_planner
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/src/planner/traj_utils/include/traj_utils/planning_visualization.h b/src/planner/traj_utils/include/traj_utils/planning_visualization.h
+index 0d8e8ba..21cb0e4 100755
+--- a/src/planner/traj_utils/include/traj_utils/planning_visualization.h
++++ b/src/planner/traj_utils/include/traj_utils/planning_visualization.h
+@@ -6,8 +6,9 @@
+ // #include <bspline_opt/uniform_bspline.h>
+ #include <iostream>
+ // #include <bspline_opt/polynomial_traj.h>
+-#include <rclcpp/rclcpp.hpp>
+-#include <vector>
++#include <rclcpp/rclcpp.hpp>
++#include <traj_utils/eigen_types.hpp>
++#include <vector>
+ #include <visualization_msgs/msg/marker.hpp>
+ #include <visualization_msgs/msg/marker_array.hpp>
+ #include <geometry_msgs/msg/point.hpp>
+@@ -43,21 +44,21 @@ namespace ego_planner
+ 
+     typedef std::shared_ptr<PlanningVisualization> Ptr;
+ 
+-    void displayMarkerList(rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr &pub, const std::vector<Eigen::Vector3d> &list, double scale,
+-                           Eigen::Vector4d color, int id, bool show_sphere = true);
+-    void generatePathDisplayArray(visualization_msgs::msg::MarkerArray &array,
+-                                  const std::vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id);
+-    void generateArrowDisplayArray(visualization_msgs::msg::MarkerArray &array,
+-                                   const std::vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id);
+-    void displayGoalPoint(Eigen::Vector3d goal_point, Eigen::Vector4d color, const double scale, int id);
+-    void displayGlobalPathList(std::vector<Eigen::Vector3d> global_pts, const double scale, int id);
+-    void displayInitPathList(std::vector<Eigen::Vector3d> init_pts, const double scale, int id);
+-    void displayMultiInitPathList(std::vector<std::vector<Eigen::Vector3d>> init_trajs, const double scale);
+-    void displayOptimalList(Eigen::MatrixXd optimal_pts, int id);
+-    void displayAStarList(std::vector<std::vector<Eigen::Vector3d>> a_star_paths, int id);
+-    void displayArrowList(rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr &pub, const std::vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id);
++    void displayMarkerList(rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr &pub, const Vec3dList &list, double scale,
++                           Eigen::Vector4d color, int id, bool show_sphere = true);
++    void generatePathDisplayArray(visualization_msgs::msg::MarkerArray &array,
++                                  const Vec3dList &list, double scale, Eigen::Vector4d color, int id);
++    void generateArrowDisplayArray(visualization_msgs::msg::MarkerArray &array,
++                                   const Vec3dList &list, double scale, Eigen::Vector4d color, int id);
++    void displayGoalPoint(Eigen::Vector3d goal_point, Eigen::Vector4d color, const double scale, int id);
++    void displayGlobalPathList(Vec3dList global_pts, const double scale, int id);
++    void displayInitPathList(Vec3dList init_pts, const double scale, int id);
++    void displayMultiInitPathList(Vec3dListList init_trajs, const double scale);
++    void displayOptimalList(Eigen::MatrixXd optimal_pts, int id);
++    void displayAStarList(Vec3dListList a_star_paths, int id);
++    void displayArrowList(rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr &pub, const Vec3dList &list, double scale, Eigen::Vector4d color, int id);
+     // void displayIntermediateState(ros::Publisher& intermediate_pub, ego_planner::BsplineOptimizer::Ptr optimizer, double sleep_time, const int start_iteration);
+     // void displayNewArrow(ros::Publisher& guide_vector_pub, ego_planner::BsplineOptimizer::Ptr optimizer);
+   };
+ } // namespace ego_planner
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/src/planner/traj_utils/src/planning_visualization.cpp b/src/planner/traj_utils/src/planning_visualization.cpp
+index 5c46cef..3ee529c 100755
+--- a/src/planner/traj_utils/src/planning_visualization.cpp
++++ b/src/planner/traj_utils/src/planning_visualization.cpp
+@@ -7,7 +7,7 @@ namespace ego_planner
+ {
+ 
+   // // real ids used: {id, id+1000}
+-  void PlanningVisualization::displayMarkerList(rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr &pub, const vector<Eigen::Vector3d> &list, double scale,
++  void PlanningVisualization::displayMarkerList(rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr &pub, const Vec3dList &list, double scale,
+                                                 Eigen::Vector4d color, int id, bool show_sphere /* = true */)
+   {
+     visualization_msgs::msg::Marker sphere, line_strip;
+@@ -43,7 +43,7 @@ namespace ego_planner
+ 
+   // real ids used: {id, id+1}
+   void PlanningVisualization::generatePathDisplayArray(visualization_msgs::msg::MarkerArray &array,
+-                                                       const vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id)
++                                                       const Vec3dList &list, double scale, Eigen::Vector4d color, int id)
+   {
+     visualization_msgs::msg::Marker sphere, line_strip;
+     sphere.header.frame_id = line_strip.header.frame_id = "map";
+@@ -78,7 +78,7 @@ namespace ego_planner
+ 
+   // real ids used: {1000*id ~ (arrow nums)+1000*id}
+   void PlanningVisualization::generateArrowDisplayArray(visualization_msgs::msg::MarkerArray &array,
+-                                                        const vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id)
++                                                        const Vec3dList &list, double scale, Eigen::Vector4d color, int id)
+   {
+     visualization_msgs::msg::Marker arrow;
+     arrow.header.frame_id = "map";
+@@ -143,7 +143,7 @@ namespace ego_planner
+     goal_point_pub->publish(sphere);
+   }
+ 
+-  void PlanningVisualization::displayGlobalPathList(vector<Eigen::Vector3d> init_pts, const double scale, int id)
++  void PlanningVisualization::displayGlobalPathList(Vec3dList init_pts, const double scale, int id)
+   {
+ 
+     if (global_list_pub->get_subscription_count() == 0)
+@@ -155,7 +155,7 @@ namespace ego_planner
+     displayMarkerList(global_list_pub, init_pts, scale, color, id);
+   }
+ 
+-  void PlanningVisualization::displayMultiInitPathList(vector<vector<Eigen::Vector3d>> init_trajs, const double scale)
++  void PlanningVisualization::displayMultiInitPathList(Vec3dListList init_trajs, const double scale)
+   {
+ 
+     if (init_list_pub->get_subscription_count() == 0)
+@@ -168,7 +168,7 @@ namespace ego_planner
+     for (int id = 0; id < last_nums; id++)
+     {
+       Eigen::Vector4d color(0, 0, 0, 0);
+-      vector<Eigen::Vector3d> blank;
++      Vec3dList blank;
+       displayMarkerList(init_list_pub, blank, scale, color, id, false);
+       rclcpp::sleep_for(std::chrono::milliseconds(1));
+     }
+@@ -183,7 +183,7 @@ namespace ego_planner
+     }
+   }
+ 
+-  void PlanningVisualization::displayInitPathList(vector<Eigen::Vector3d> init_pts, const double scale, int id)
++  void PlanningVisualization::displayInitPathList(Vec3dList init_pts, const double scale, int id)
+   {
+ 
+     if (init_list_pub->get_subscription_count() == 0)
+@@ -203,7 +203,7 @@ namespace ego_planner
+       return;
+     }
+ 
+-    vector<Eigen::Vector3d> list;
++    Vec3dList list;
+     for (int i = 0; i < optimal_pts.cols(); i++)
+     {
+       Eigen::Vector3d pt = optimal_pts.col(i).transpose();
+@@ -213,7 +213,7 @@ namespace ego_planner
+     displayMarkerList(optimal_list_pub, list, 0.15, color, id);
+   }
+ 
+-  void PlanningVisualization::displayAStarList(std::vector<std::vector<Eigen::Vector3d>> a_star_paths, int id /* = Eigen::Vector4d(0.5,0.5,0,1)*/)
++  void PlanningVisualization::displayAStarList(Vec3dListList a_star_paths, int id /* = Eigen::Vector4d(0.5,0.5,0,1)*/)
+   {
+ 
+     if (a_star_list_pub->get_subscription_count() == 0)
+@@ -222,7 +222,7 @@ namespace ego_planner
+     }
+ 
+     int i = 0;
+-    vector<Eigen::Vector3d> list;
++    Vec3dList list;
+ 
+     Eigen::Vector4d color = Eigen::Vector4d(0.5 + ((double)rand() / RAND_MAX / 2), 0.5 + ((double)rand() / RAND_MAX / 2), 0, 1); // make the A star pathes different every time.
+     double scale = 0.05 + (double)rand() / RAND_MAX / 10;
+@@ -240,7 +240,7 @@ namespace ego_planner
+     }
+   }
+ 
+-  void PlanningVisualization::displayArrowList(rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr &pub, const vector<Eigen::Vector3d> &list, double scale, Eigen::Vector4d color, int id)
++  void PlanningVisualization::displayArrowList(rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr &pub, const Vec3dList &list, double scale, Eigen::Vector4d color, int id)
+   {
+     visualization_msgs::msg::MarkerArray array;
+     // clear
+@@ -252,4 +252,4 @@ namespace ego_planner
+   }
+ 
+   // PlanningVisualization::
+-} // namespace ego_planner
+\ No newline at end of file
++} // namespace ego_planner

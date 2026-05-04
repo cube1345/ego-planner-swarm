@@ -1,0 +1,23 @@
+{
+  "duration_sec": 45.05244207382202,
+  "obstacle_points": 152095,
+  "obstacle_voxels": 37373,
+  "obstacle_clusters_est": 148,
+  "occupancy_points_latest": 3988,
+  "occupancy_points_peak": 4044,
+  "replan_count": 0,
+  "replan_base_total": 37,
+  "replan_final_total": 37,
+  "avg_replan_interval_sec": 0.0,
+  "turn_count": 0,
+  "path_length_m": 0.0,
+  "max_speed_mps": 0.0,
+  "goal_reached_time_sec": 0.8061866760253906,
+  "goal_xyz": [
+    15.0,
+    0.0,
+    1.0
+  ],
+  "goal_tolerance_m": 0.6,
+  "odom_samples": 2249
+}

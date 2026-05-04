@@ -1,0 +1,2 @@
+[INFO] [1777787458.743026060] [lidar_depth_fusion_node]: Fusion node ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points out=/drone_0_fusion/fused_cloud frame=world
+[INFO] [1777787482.801152242] [lidar_depth_fusion_node]: fusion frame=20 depth_pts=0 lidar_pts=1023 fused_voxels=8 depth_only=0 lidar_only=8 dual=0 retention=0.008 min_prob=0.280 near_radius=4.00 lidar_growth=5.00 min_hits=2

@@ -1,0 +1,4 @@
+[INFO] [1777780774.877571719] [sim_flight_stats_report]: stats monitor started. duration=0.1s global=/map_generator/global_cloud occupancy=/drone_0_grid/grid_map/occupancy_inflate odom=/drone_0_visual_slam/odom replan_log_root=artifacts/headless_eval/headless_metrics_verify_fix2_20260503_ros_logs
+[INFO] [1777780775.069834146] [sim_flight_stats_report]: done. json=/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/artifacts/headless_eval/sim_stats_headless_verify_fix2_recount_20260503/sim_stats_summary.json
+[INFO] [1777780775.070032889] [sim_flight_stats_report]: done. md=/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/artifacts/headless_eval/sim_stats_headless_verify_fix2_recount_20260503/sim_stats_summary.md
+[INFO] [1777780775.070172016] [sim_flight_stats_report]: done. svg=/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/artifacts/headless_eval/sim_stats_headless_verify_fix2_recount_20260503/sim_stats_dashboard.svg

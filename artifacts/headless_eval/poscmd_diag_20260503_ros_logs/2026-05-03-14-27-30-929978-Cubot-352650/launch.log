@@ -1,0 +1,10 @@
+1777789650.9316752 [INFO] [launch]: All log files can be found below artifacts/headless_eval/poscmd_diag_20260503_ros_logs/2026-05-03-14-27-30-929978-Cubot-352650
+1777789650.9319196 [INFO] [launch]: Default logging verbosity is set to INFO
+1777789651.1695297 [INFO] [mockamap_node-1]: process started with pid [352652]
+1777789651.1699238 [INFO] [ego_planner_node-2]: process started with pid [352654]
+1777789651.1700697 [INFO] [traj_server-3]: process started with pid [352656]
+1777789651.1701868 [INFO] [simulated_lidar_cloud.py-4]: process started with pid [352658]
+1777789651.1702936 [INFO] [python3-5]: process started with pid [352660]
+1777789651.1703970 [INFO] [poscmd_2_odom-6]: process started with pid [352662]
+1777789651.1704917 [INFO] [odom_visualization-7]: process started with pid [352668]
+1777789651.1706419 [INFO] [pcl_render_node-8]: process started with pid [352674]

@@ -1,0 +1,21 @@
+# Simulation Stats Summary
+
+| metric | value |
+|---|---:|
+| duration_sec | 17.686184406280518 |
+| obstacle_points | 299999 |
+| obstacle_voxels | 58996 |
+| obstacle_clusters_est | 187 |
+| occupancy_points_latest | 43744 |
+| occupancy_points_peak | 46087 |
+| replan_count | 28 |
+| replan_base_total | 0 |
+| replan_final_total | 28 |
+| avg_replan_interval_sec | 0.6316494430814471 |
+| turn_count | 0 |
+| path_length_m | 22.28236164399603 |
+| max_speed_mps | 3.1567476130877052 |
+| goal_reached_time_sec | 16.503880262374878 |
+| goal_xyz | [15.0, 0.0, 1.0] |
+| goal_tolerance_m | 0.6 |
+| odom_samples | 1765 |

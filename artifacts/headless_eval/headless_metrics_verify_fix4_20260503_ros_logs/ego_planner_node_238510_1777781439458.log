@@ -1,0 +1,41 @@
+[INFO] [1777781439.546144838] [drone_0_ego_planner_node]: Wait for 1 second.
+[WARN] [1777781440.714240311] [drone_0_ego_planner_node]: Waiting for trigger from [n3ctrl] from RC
+[WARN] [1777781441.900966199] [drone_0_ego_planner_node]: current traj in collision, replan.
+[WARN] [1777781448.543525892] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=1
+[ERROR] [1777781448.544132873] [Coord2Index]: Ran out of pool, index=76 -1 56, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570246630] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570359134] [check_collision_and_rebound]: a star error
+[ERROR] [1777781448.570501674] [Coord2Index]: Ran out of pool, index=78 -1 56, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570518316] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570525871] [check_collision_and_rebound]: a star error
+[ERROR] [1777781448.570570243] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570594063] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570601833] [check_collision_and_rebound]: a star error
+[ERROR] [1777781448.570635096] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570643677] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570650173] [check_collision_and_rebound]: a star error
+[ERROR] [1777781448.570680819] [Coord2Index]: Ran out of pool, index=78 -1 55, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570689164] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570695636] [check_collision_and_rebound]: a star error
+[ERROR] [1777781448.570725224] [Coord2Index]: Ran out of pool, index=79 -1 55, POOL_SIZE=100 100 100
+[ERROR] [1777781448.570733500] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.570739909] [check_collision_and_rebound]: a star error
+[WARN] [1777781448.596290932] [distinctiveTrajs]: Can't find the new base points at the opposite within the threshold. i=0, j=1
+[ERROR] [1777781448.598475569] [Coord2Index]: Ran out of pool, index=-1 26 66, POOL_SIZE=100 100 100
+[ERROR] [1777781448.598517137] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781448.598528711] [initControlPoints]: a star error, force return!
+[WARN] [1777781449.744678064] [rebound_optimize]: First 3 control points in obstacles! return false, t=0.277448
+[WARN] [1777781449.895170471] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[WARN] [1777781449.895233345] [check_collision_and_rebound]: Failed to generate direction. It doesn't matter.
+[ERROR] [1777781449.944021537] [Coord2Index]: Ran out of pool, index=100 61 62, POOL_SIZE=100 100 100
+[ERROR] [1777781449.944059095] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781449.944070067] [check_collision_and_rebound]: a star error
+[ERROR] [1777781449.944117098] [Coord2Index]: Ran out of pool, index=100 62 61, POOL_SIZE=100 100 100
+[ERROR] [1777781449.944127600] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781449.944135042] [check_collision_and_rebound]: a star error
+[ERROR] [1777781449.944171871] [Coord2Index]: Ran out of pool, index=100 63 61, POOL_SIZE=100 100 100
+[ERROR] [1777781449.944181432] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781449.944188368] [check_collision_and_rebound]: a star error
+[ERROR] [1777781449.944221332] [Coord2Index]: Ran out of pool, index=100 63 61, POOL_SIZE=100 100 100
+[ERROR] [1777781449.944230980] [AstarSearch]: Unable to handle the initial or end point, force return!
+[ERROR] [1777781449.944237905] [check_collision_and_rebound]: a star error

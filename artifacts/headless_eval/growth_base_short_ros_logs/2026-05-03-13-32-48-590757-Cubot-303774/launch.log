@@ -1,0 +1,11 @@
+1777786368.5919971 [INFO] [launch]: All log files can be found below artifacts/headless_eval/growth_base_short_ros_logs/2026-05-03-13-32-48-590757-Cubot-303774
+1777786368.5921459 [INFO] [launch]: Default logging verbosity is set to INFO
+1777786368.6927238 [INFO] [random_forest-1]: process started with pid [303776]
+1777786368.6932373 [INFO] [ego_planner_node-2]: process started with pid [303778]
+1777786368.6934583 [INFO] [traj_server-3]: process started with pid [303780]
+1777786368.6935995 [INFO] [simulated_lidar_cloud.py-4]: process started with pid [303782]
+1777786368.6937392 [INFO] [python3-5]: process started with pid [303784]
+1777786368.6938694 [INFO] [poscmd_2_odom-6]: process started with pid [303786]
+1777786368.6940022 [INFO] [odom_visualization-7]: process started with pid [303788]
+1777786368.6941547 [INFO] [pcl_render_node-8]: process started with pid [303790]
+1777786371.1731329 [ERROR] [python3-5]: process has died [pid 303784, exit code 1, cmd '/usr/bin/python3 /home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/install/ego_planner/lib/ego_planner/ros2_lidar_depth_fusion_node.py --ros-args -p depth_cloud_topic:=/drone_0_pcl_render_node/cloud -p lidar_cloud_topic:=/drone_0_lidar/points -p odom_topic:=/drone_0_visual_slam/odom -p output_topic:=/drone_0_fusion/fused_cloud -p output_frame:=world -p publish_debug_stats_every:=20 -p near_field_radius:=4.0 -p lidar_growth:=5.0 -p max_range:=10.0 -p min_probability:=0.30 -p adaptive_min_probability_enable:=True -p adaptive_min_probability_min:=0.20 -p adaptive_min_probability_max:=0.35 -p adaptive_min_probability_step:=0.02 -p adaptive_lidar_growth_enable:=False -p adaptive_lidar_growth_min:=4.0 -p adaptive_lidar_growth_max:=6.0 -p adaptive_lidar_growth_step:=0.5 -p adaptive_target_retention:=0.30 -p adaptive_retention_band:=0.05 -p adaptive_eval_range:=10.0 -p adaptive_min_gt_voxels:=40 -p adaptive_score_alpha:=0.35'].

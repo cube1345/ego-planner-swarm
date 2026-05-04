@@ -153,12 +153,13 @@ $$
 其余 `adaptive_*` 参数大多属于以下两类：
 
 1. 开关与边界控制
+
    - `adaptive_min_probability_enable`
    - `adaptive_min_probability_min`
    - `adaptive_min_probability_max`
    - `adaptive_min_probability_step`
-
 2. 评估与平滑超参数
+
    - `adaptive_eval_range`
    - `adaptive_min_gt_voxels`
    - `adaptive_score_alpha`
@@ -224,7 +225,7 @@ $$
 
 ## 9. 结论
 
-基于当前项目代码可以明确得出：现阶段的多模态融合增强，本质上是“体素级几何占据证据融合 + 单参数在线阈值自适应”。  
+基于当前项目代码可以明确得出：现阶段的多模态融合增强，本质上是“体素级几何占据证据融合 + 单参数在线阈值自适应”。
 当前真正在线自适应的参数只有一个，即融合层障碍接受阈值 `min_probability`。其他 `adaptive_*` 参数要么用于定义搜索边界，要么用于控制平滑和评估范围，并不构成独立的在线自适应对象。
 
 从工程角度看，这种设计是合理的第一步：它既能显式提升融合输入质量，又不会把问题扩散到规划层和控制层，从而保留了系统调试与结果解释的可控性。

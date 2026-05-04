@@ -1,0 +1,19 @@
+[INFO] [1777780095.991054525] [fusion_benefit_report]: fusion benefit report ready. depth=/drone_0_pcl_render_node/cloud lidar=/drone_0_lidar/points fusion=/drone_0_fusion/fused_cloud global=/map_generator/global_cloud odom=/drone_0_visual_slam/odom
+[INFO] [1777780104.070079673] [fusion_benefit_report]: [fusion-benefit] window=15 recall(d/l/f)=0.088/0.104/0.170 f1(d/l/f)=0.161/0.189/0.290 gain_recall=+0.062 gain_f1=+0.096 union_recall=0.174
+[INFO] [1777780111.217082428] [fusion_benefit_report]: [fusion-benefit] window=30 recall(d/l/f)=0.085/0.101/0.164 f1(d/l/f)=0.156/0.184/0.282 gain_recall=+0.061 gain_f1=+0.095 union_recall=0.167
+[INFO] [1777780117.790665781] [fusion_benefit_report]: [fusion-benefit] window=45 recall(d/l/f)=0.069/0.110/0.168 f1(d/l/f)=0.126/0.198/0.286 gain_recall=+0.056 gain_f1=+0.085 union_recall=0.164
+[INFO] [1777780123.544454205] [fusion_benefit_report]: [fusion-benefit] window=60 recall(d/l/f)=0.051/0.092/0.136 f1(d/l/f)=0.094/0.166/0.234 gain_recall=+0.043 gain_f1=+0.066 union_recall=0.132
+[INFO] [1777780129.365290937] [fusion_benefit_report]: [fusion-benefit] window=60 recall(d/l/f)=0.029/0.074/0.102 f1(d/l/f)=0.054/0.134/0.177 gain_recall=+0.028 gain_f1=+0.042 union_recall=0.096
+[INFO] [1777780135.213405088] [fusion_benefit_report]: [fusion-benefit] window=60 recall(d/l/f)=0.009/0.057/0.070 f1(d/l/f)=0.016/0.105/0.124 gain_recall=+0.013 gain_f1=+0.019 union_recall=0.064
+Traceback (most recent call last):
+  File "/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/fusion_benefit_report.py", line 316, in <module>
+    main()
+  File "/home/cube/WorkSpace/ROS/Ego_Planner/ego-planner-swarm/src/planner/plan_manage/scripts/fusion_benefit_report.py", line 312, in main
+    rclpy.shutdown()
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 130, in shutdown
+    _shutdown(context=context)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/utilities.py", line 58, in shutdown
+    return context.shutdown()
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/context.py", line 102, in shutdown
+    self.__context.shutdown()
+rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:241
