@@ -19,9 +19,30 @@ ADAPTIVE_MAX="0.35"
 ADAPTIVE_STEP="0.02"
 NEAR_FIELD_RADIUS="4.0"
 LIDAR_GROWTH="5.0"
+DEPTH_DECAY="4.5"
+ADAPTIVE_DEPTH_DECAY_ENABLE="False"
+ADAPTIVE_DEPTH_DECAY_MIN="3.5"
+ADAPTIVE_DEPTH_DECAY_MAX="5.5"
+ADAPTIVE_DEPTH_DECAY_STEP="1.0"
+FUSION_Z_MAX="3.5"
+ADAPTIVE_Z_MAX_ENABLE="False"
+ADAPTIVE_Z_MAX_MIN="3.0"
+ADAPTIVE_Z_MAX_MAX="3.5"
+ADAPTIVE_Z_MAX_STEP="0.25"
 ADAPTIVE_MIN_HITS_ENABLE="True"
 ADAPTIVE_MIN_HITS_MIN="1"
 ADAPTIVE_MIN_HITS_MAX="3"
+ADAPTIVE_RETENTION_ENABLE="False"
+ADAPTIVE_RETENTION_TARGET="0.30"
+ADAPTIVE_RETENTION_BAND="0.05"
+ADAPTIVE_LIDAR_GROWTH_ENABLE="False"
+ADAPTIVE_LIDAR_GROWTH_MIN="3.8"
+ADAPTIVE_LIDAR_GROWTH_MAX="4.2"
+ADAPTIVE_LIDAR_GROWTH_STEP="0.2"
+ADAPTIVE_DUAL_BONUS_ENABLE="False"
+ADAPTIVE_DUAL_BONUS_MIN="0.0"
+ADAPTIVE_DUAL_BONUS_MAX="0.4"
+ADAPTIVE_DUAL_BONUS_STEP="0.2"
 ADAPTIVE_EVAL_RANGE="10.0"
 ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
@@ -52,9 +73,30 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-step FLOAT
   --near-field-radius FLOAT
   --lidar-growth FLOAT
+  --depth-decay FLOAT
+  --adaptive-depth-decay-enable True|False
+  --adaptive-depth-decay-min FLOAT
+  --adaptive-depth-decay-max FLOAT
+  --adaptive-depth-decay-step FLOAT
+  --fusion-z-max FLOAT
+  --adaptive-z-max-enable True|False
+  --adaptive-z-max-min FLOAT
+  --adaptive-z-max-max FLOAT
+  --adaptive-z-max-step FLOAT
   --adaptive-min-hits-enable True|False
   --adaptive-min-hits-min INT
   --adaptive-min-hits-max INT
+  --adaptive-retention-enable True|False
+  --adaptive-retention-target FLOAT
+  --adaptive-retention-band FLOAT
+  --adaptive-lidar-growth-enable True|False
+  --adaptive-lidar-growth-min FLOAT
+  --adaptive-lidar-growth-max FLOAT
+  --adaptive-lidar-growth-step FLOAT
+  --adaptive-dual-bonus-enable True|False
+  --adaptive-dual-bonus-min FLOAT
+  --adaptive-dual-bonus-max FLOAT
+  --adaptive-dual-bonus-step FLOAT
   --adaptive-eval-range FLOAT
   --adaptive-min-gt-voxels INT
   --adaptive-score-alpha FLOAT
@@ -85,9 +127,30 @@ while [[ $# -gt 0 ]]; do
     --adaptive-step) ADAPTIVE_STEP="$2"; shift 2 ;;
     --near-field-radius) NEAR_FIELD_RADIUS="$2"; shift 2 ;;
     --lidar-growth) LIDAR_GROWTH="$2"; shift 2 ;;
+    --depth-decay) DEPTH_DECAY="$2"; shift 2 ;;
+    --adaptive-depth-decay-enable) ADAPTIVE_DEPTH_DECAY_ENABLE="$2"; shift 2 ;;
+    --adaptive-depth-decay-min) ADAPTIVE_DEPTH_DECAY_MIN="$2"; shift 2 ;;
+    --adaptive-depth-decay-max) ADAPTIVE_DEPTH_DECAY_MAX="$2"; shift 2 ;;
+    --adaptive-depth-decay-step) ADAPTIVE_DEPTH_DECAY_STEP="$2"; shift 2 ;;
+    --fusion-z-max) FUSION_Z_MAX="$2"; shift 2 ;;
+    --adaptive-z-max-enable) ADAPTIVE_Z_MAX_ENABLE="$2"; shift 2 ;;
+    --adaptive-z-max-min) ADAPTIVE_Z_MAX_MIN="$2"; shift 2 ;;
+    --adaptive-z-max-max) ADAPTIVE_Z_MAX_MAX="$2"; shift 2 ;;
+    --adaptive-z-max-step) ADAPTIVE_Z_MAX_STEP="$2"; shift 2 ;;
     --adaptive-min-hits-enable) ADAPTIVE_MIN_HITS_ENABLE="$2"; shift 2 ;;
     --adaptive-min-hits-min) ADAPTIVE_MIN_HITS_MIN="$2"; shift 2 ;;
     --adaptive-min-hits-max) ADAPTIVE_MIN_HITS_MAX="$2"; shift 2 ;;
+    --adaptive-retention-enable) ADAPTIVE_RETENTION_ENABLE="$2"; shift 2 ;;
+    --adaptive-retention-target) ADAPTIVE_RETENTION_TARGET="$2"; shift 2 ;;
+    --adaptive-retention-band) ADAPTIVE_RETENTION_BAND="$2"; shift 2 ;;
+    --adaptive-lidar-growth-enable) ADAPTIVE_LIDAR_GROWTH_ENABLE="$2"; shift 2 ;;
+    --adaptive-lidar-growth-min) ADAPTIVE_LIDAR_GROWTH_MIN="$2"; shift 2 ;;
+    --adaptive-lidar-growth-max) ADAPTIVE_LIDAR_GROWTH_MAX="$2"; shift 2 ;;
+    --adaptive-lidar-growth-step) ADAPTIVE_LIDAR_GROWTH_STEP="$2"; shift 2 ;;
+    --adaptive-dual-bonus-enable) ADAPTIVE_DUAL_BONUS_ENABLE="$2"; shift 2 ;;
+    --adaptive-dual-bonus-min) ADAPTIVE_DUAL_BONUS_MIN="$2"; shift 2 ;;
+    --adaptive-dual-bonus-max) ADAPTIVE_DUAL_BONUS_MAX="$2"; shift 2 ;;
+    --adaptive-dual-bonus-step) ADAPTIVE_DUAL_BONUS_STEP="$2"; shift 2 ;;
     --adaptive-eval-range) ADAPTIVE_EVAL_RANGE="$2"; shift 2 ;;
     --adaptive-min-gt-voxels) ADAPTIVE_MIN_GT_VOXELS="$2"; shift 2 ;;
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
@@ -196,6 +259,16 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   point0_z:="$POINT0_Z" \
   near_field_radius:="$NEAR_FIELD_RADIUS" \
   lidar_growth:="$LIDAR_GROWTH" \
+  depth_decay:="$DEPTH_DECAY" \
+  adaptive_depth_decay_enable:="$ADAPTIVE_DEPTH_DECAY_ENABLE" \
+  adaptive_depth_decay_min:="$ADAPTIVE_DEPTH_DECAY_MIN" \
+  adaptive_depth_decay_max:="$ADAPTIVE_DEPTH_DECAY_MAX" \
+  adaptive_depth_decay_step:="$ADAPTIVE_DEPTH_DECAY_STEP" \
+  fusion_z_max:="$FUSION_Z_MAX" \
+  adaptive_z_max_enable:="$ADAPTIVE_Z_MAX_ENABLE" \
+  adaptive_z_max_min:="$ADAPTIVE_Z_MAX_MIN" \
+  adaptive_z_max_max:="$ADAPTIVE_Z_MAX_MAX" \
+  adaptive_z_max_step:="$ADAPTIVE_Z_MAX_STEP" \
   min_probability:="$MIN_PROBABILITY" \
   min_hits:="$MIN_HITS" \
   adaptive_min_probability_enable:="$ADAPTIVE_ENABLE" \
@@ -205,6 +278,17 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   adaptive_min_hits_enable:="$ADAPTIVE_MIN_HITS_ENABLE" \
   adaptive_min_hits_min:="$ADAPTIVE_MIN_HITS_MIN" \
   adaptive_min_hits_max:="$ADAPTIVE_MIN_HITS_MAX" \
+  adaptive_retention_enable:="$ADAPTIVE_RETENTION_ENABLE" \
+  adaptive_target_retention:="$ADAPTIVE_RETENTION_TARGET" \
+  adaptive_retention_band:="$ADAPTIVE_RETENTION_BAND" \
+  adaptive_lidar_growth_enable:="$ADAPTIVE_LIDAR_GROWTH_ENABLE" \
+  adaptive_lidar_growth_min:="$ADAPTIVE_LIDAR_GROWTH_MIN" \
+  adaptive_lidar_growth_max:="$ADAPTIVE_LIDAR_GROWTH_MAX" \
+  adaptive_lidar_growth_step:="$ADAPTIVE_LIDAR_GROWTH_STEP" \
+  adaptive_dual_bonus_enable:="$ADAPTIVE_DUAL_BONUS_ENABLE" \
+  adaptive_dual_bonus_min:="$ADAPTIVE_DUAL_BONUS_MIN" \
+  adaptive_dual_bonus_max:="$ADAPTIVE_DUAL_BONUS_MAX" \
+  adaptive_dual_bonus_step:="$ADAPTIVE_DUAL_BONUS_STEP" \
   adaptive_eval_range:="$ADAPTIVE_EVAL_RANGE" \
   adaptive_min_gt_voxels:="$ADAPTIVE_MIN_GT_VOXELS" \
   adaptive_score_alpha:="$ADAPTIVE_SCORE_ALPHA" \
