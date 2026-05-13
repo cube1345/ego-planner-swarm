@@ -18,6 +18,10 @@ ADAPTIVE_MIN="0.20"
 ADAPTIVE_MAX="0.35"
 ADAPTIVE_STEP="0.02"
 NEAR_FIELD_RADIUS="4.0"
+ADAPTIVE_NEAR_FIELD_RADIUS_ENABLE="False"
+ADAPTIVE_NEAR_FIELD_RADIUS_MIN="3.0"
+ADAPTIVE_NEAR_FIELD_RADIUS_MAX="5.0"
+ADAPTIVE_NEAR_FIELD_RADIUS_STEP="1.0"
 LIDAR_GROWTH="5.0"
 DEPTH_DECAY="4.5"
 ADAPTIVE_DEPTH_DECAY_ENABLE="False"
@@ -39,10 +43,10 @@ ADAPTIVE_LIDAR_GROWTH_ENABLE="False"
 ADAPTIVE_LIDAR_GROWTH_MIN="3.8"
 ADAPTIVE_LIDAR_GROWTH_MAX="4.2"
 ADAPTIVE_LIDAR_GROWTH_STEP="0.2"
-ADAPTIVE_DUAL_BONUS_ENABLE="False"
+ADAPTIVE_DUAL_BONUS_ENABLE="True"
 ADAPTIVE_DUAL_BONUS_MIN="0.0"
-ADAPTIVE_DUAL_BONUS_MAX="0.4"
-ADAPTIVE_DUAL_BONUS_STEP="0.2"
+ADAPTIVE_DUAL_BONUS_MAX="0.2"
+ADAPTIVE_DUAL_BONUS_STEP="0.1"
 ADAPTIVE_EVAL_RANGE="10.0"
 ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
@@ -72,6 +76,10 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-max FLOAT
   --adaptive-step FLOAT
   --near-field-radius FLOAT
+  --adaptive-near-field-radius-enable True|False
+  --adaptive-near-field-radius-min FLOAT
+  --adaptive-near-field-radius-max FLOAT
+  --adaptive-near-field-radius-step FLOAT
   --lidar-growth FLOAT
   --depth-decay FLOAT
   --adaptive-depth-decay-enable True|False
@@ -126,6 +134,10 @@ while [[ $# -gt 0 ]]; do
     --adaptive-max) ADAPTIVE_MAX="$2"; shift 2 ;;
     --adaptive-step) ADAPTIVE_STEP="$2"; shift 2 ;;
     --near-field-radius) NEAR_FIELD_RADIUS="$2"; shift 2 ;;
+    --adaptive-near-field-radius-enable) ADAPTIVE_NEAR_FIELD_RADIUS_ENABLE="$2"; shift 2 ;;
+    --adaptive-near-field-radius-min) ADAPTIVE_NEAR_FIELD_RADIUS_MIN="$2"; shift 2 ;;
+    --adaptive-near-field-radius-max) ADAPTIVE_NEAR_FIELD_RADIUS_MAX="$2"; shift 2 ;;
+    --adaptive-near-field-radius-step) ADAPTIVE_NEAR_FIELD_RADIUS_STEP="$2"; shift 2 ;;
     --lidar-growth) LIDAR_GROWTH="$2"; shift 2 ;;
     --depth-decay) DEPTH_DECAY="$2"; shift 2 ;;
     --adaptive-depth-decay-enable) ADAPTIVE_DEPTH_DECAY_ENABLE="$2"; shift 2 ;;
@@ -258,6 +270,10 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   point0_y:="$POINT0_Y" \
   point0_z:="$POINT0_Z" \
   near_field_radius:="$NEAR_FIELD_RADIUS" \
+  adaptive_near_field_radius_enable:="$ADAPTIVE_NEAR_FIELD_RADIUS_ENABLE" \
+  adaptive_near_field_radius_min:="$ADAPTIVE_NEAR_FIELD_RADIUS_MIN" \
+  adaptive_near_field_radius_max:="$ADAPTIVE_NEAR_FIELD_RADIUS_MAX" \
+  adaptive_near_field_radius_step:="$ADAPTIVE_NEAR_FIELD_RADIUS_STEP" \
   lidar_growth:="$LIDAR_GROWTH" \
   depth_decay:="$DEPTH_DECAY" \
   adaptive_depth_decay_enable:="$ADAPTIVE_DEPTH_DECAY_ENABLE" \

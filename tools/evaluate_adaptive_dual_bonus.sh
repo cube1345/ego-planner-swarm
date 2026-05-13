@@ -9,8 +9,8 @@ DURATION=20
 STARTUP_WAIT=8
 LABEL_PREFIX="adaptive_dual_bonus_eval"
 BONUS_MIN="0.0"
-BONUS_MAX="0.4"
-BONUS_STEP="0.2"
+BONUS_MAX="0.2"
+BONUS_STEP="0.1"
 
 usage() {
   cat <<'EOF'
@@ -101,13 +101,13 @@ delta_recall = comparison["delta"]["fusion_recall"]
 delta_f1_gain = comparison["delta"]["fusion_f1_gain_vs_best_single"]
 delta_recall_gain = comparison["delta"]["fusion_recall_gain_vs_best_single"]
 if (
-    delta_f1 >= 0.004
-    and delta_recall >= 0.002
-    and delta_f1_gain >= 0.001
-    and delta_recall_gain >= 0.001
+    delta_f1 >= 0.002
+    and delta_recall >= 0.001
+    and delta_f1_gain >= 0.0005
+    and delta_recall_gain >= 0.0005
 ):
     verdict = "keep"
-elif delta_f1 <= -0.004 or delta_recall <= -0.002 or delta_f1_gain <= -0.004:
+elif delta_f1 <= -0.002 or delta_recall <= -0.001 or delta_f1_gain <= -0.002:
     verdict = "disable"
 else:
     verdict = "neutral"

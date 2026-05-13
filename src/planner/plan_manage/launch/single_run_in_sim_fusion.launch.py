@@ -35,6 +35,10 @@ def launch_setup(context, *args, **kwargs):
     adaptive_min_probability_step = LaunchConfiguration('adaptive_min_probability_step').perform(context)
     adaptive_min_hits_enable = LaunchConfiguration('adaptive_min_hits_enable').perform(context)
     near_field_radius = LaunchConfiguration('near_field_radius').perform(context)
+    adaptive_near_field_radius_enable = LaunchConfiguration('adaptive_near_field_radius_enable').perform(context)
+    adaptive_near_field_radius_min = LaunchConfiguration('adaptive_near_field_radius_min').perform(context)
+    adaptive_near_field_radius_max = LaunchConfiguration('adaptive_near_field_radius_max').perform(context)
+    adaptive_near_field_radius_step = LaunchConfiguration('adaptive_near_field_radius_step').perform(context)
     lidar_growth = LaunchConfiguration('lidar_growth').perform(context)
     depth_decay = LaunchConfiguration('depth_decay').perform(context)
     adaptive_depth_decay_enable = LaunchConfiguration('adaptive_depth_decay_enable').perform(context)
@@ -224,6 +228,10 @@ def launch_setup(context, *args, **kwargs):
             '-p', 'output_frame:=world',
             '-p', 'publish_debug_stats_every:=20',
             '-p', f'near_field_radius:={near_field_radius}',
+            '-p', f'adaptive_near_field_radius_enable:={adaptive_near_field_radius_enable}',
+            '-p', f'adaptive_near_field_radius_min:={adaptive_near_field_radius_min}',
+            '-p', f'adaptive_near_field_radius_max:={adaptive_near_field_radius_max}',
+            '-p', f'adaptive_near_field_radius_step:={adaptive_near_field_radius_step}',
             '-p', f'lidar_growth:={lidar_growth}',
             '-p', f'depth_decay:={depth_decay}',
             '-p', f'adaptive_depth_decay_enable:={adaptive_depth_decay_enable}',
@@ -295,6 +303,10 @@ def generate_launch_description():
         DeclareLaunchArgument('fusion_python_executable', default_value='/usr/bin/python3'),
         DeclareLaunchArgument('use_fusion', default_value='True'),
         DeclareLaunchArgument('near_field_radius', default_value='4.0'),
+        DeclareLaunchArgument('adaptive_near_field_radius_enable', default_value='False'),
+        DeclareLaunchArgument('adaptive_near_field_radius_min', default_value='3.0'),
+        DeclareLaunchArgument('adaptive_near_field_radius_max', default_value='5.0'),
+        DeclareLaunchArgument('adaptive_near_field_radius_step', default_value='1.0'),
         DeclareLaunchArgument('lidar_growth', default_value='5.0'),
         DeclareLaunchArgument('depth_decay', default_value='4.5'),
         DeclareLaunchArgument('adaptive_depth_decay_enable', default_value='False'),
@@ -322,10 +334,10 @@ def generate_launch_description():
         DeclareLaunchArgument('adaptive_lidar_growth_min', default_value='3.8'),
         DeclareLaunchArgument('adaptive_lidar_growth_max', default_value='4.2'),
         DeclareLaunchArgument('adaptive_lidar_growth_step', default_value='0.2'),
-        DeclareLaunchArgument('adaptive_dual_bonus_enable', default_value='False'),
+        DeclareLaunchArgument('adaptive_dual_bonus_enable', default_value='True'),
         DeclareLaunchArgument('adaptive_dual_bonus_min', default_value='0.0'),
-        DeclareLaunchArgument('adaptive_dual_bonus_max', default_value='0.4'),
-        DeclareLaunchArgument('adaptive_dual_bonus_step', default_value='0.2'),
+        DeclareLaunchArgument('adaptive_dual_bonus_max', default_value='0.2'),
+        DeclareLaunchArgument('adaptive_dual_bonus_step', default_value='0.1'),
         DeclareLaunchArgument('adaptive_eval_range', default_value='10.0'),
         DeclareLaunchArgument('adaptive_min_gt_voxels', default_value='40'),
         DeclareLaunchArgument('adaptive_score_alpha', default_value='0.35'),

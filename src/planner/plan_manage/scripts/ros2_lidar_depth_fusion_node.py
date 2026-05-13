@@ -88,6 +88,10 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("adaptive_depth_decay_step", 1.0)
         self.declare_parameter("max_range", 12.0)
         self.declare_parameter("near_field_radius", 4.0)
+        self.declare_parameter("adaptive_near_field_radius_enable", False)
+        self.declare_parameter("adaptive_near_field_radius_min", 3.0)
+        self.declare_parameter("adaptive_near_field_radius_max", 5.0)
+        self.declare_parameter("adaptive_near_field_radius_step", 1.0)
         self.declare_parameter("depth_decay", 4.5)
         self.declare_parameter("lidar_growth", 5.0)
         self.declare_parameter("min_probability", 0.30)
@@ -108,8 +112,8 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("adaptive_lidar_growth_step", 0.2)
         self.declare_parameter("adaptive_dual_bonus_enable", False)
         self.declare_parameter("adaptive_dual_bonus_min", 0.0)
-        self.declare_parameter("adaptive_dual_bonus_max", 0.4)
-        self.declare_parameter("adaptive_dual_bonus_step", 0.2)
+        self.declare_parameter("adaptive_dual_bonus_max", 0.2)
+        self.declare_parameter("adaptive_dual_bonus_step", 0.1)
         self.declare_parameter("adaptive_eval_range", 10.0)
         self.declare_parameter("adaptive_min_gt_voxels", 40)
         self.declare_parameter("adaptive_score_alpha", 0.35)
@@ -146,6 +150,18 @@ class LidarDepthFusionNode(Node):
         )
         self.max_range = float(self.get_parameter("max_range").value)
         self.near_field_radius = float(self.get_parameter("near_field_radius").value)
+        self.adaptive_near_field_radius_enable = bool(
+            self.get_parameter("adaptive_near_field_radius_enable").value
+        )
+        self.adaptive_near_field_radius_min = float(
+            self.get_parameter("adaptive_near_field_radius_min").value
+        )
+        self.adaptive_near_field_radius_max = float(
+            self.get_parameter("adaptive_near_field_radius_max").value
+        )
+        self.adaptive_near_field_radius_step = float(
+            self.get_parameter("adaptive_near_field_radius_step").value
+        )
         self.depth_decay = float(self.get_parameter("depth_decay").value)
         self.lidar_growth = float(self.get_parameter("lidar_growth").value)
         self.min_probability = float(self.get_parameter("min_probability").value)
@@ -215,22 +231,31 @@ class LidarDepthFusionNode(Node):
         self.current_z_max = float(self.z_max)
         self.candidate_depth_decay_values = self.build_depth_decay_candidates()
         self.current_depth_decay = float(self.depth_decay)
+        self.candidate_near_field_radii = self.build_near_field_radius_candidates()
         self.candidate_probabilities = self.build_probability_candidates()
         self.candidate_min_hits = self.build_min_hits_candidates()
         self.candidate_lidar_growths = self.build_lidar_growth_candidates()
         self.candidate_dual_bonuses = self.build_dual_bonus_candidates()
         self.candidate_scores = {
-            (threshold, min_hits, lidar_growth): None
+            (threshold, min_hits, lidar_growth, near_field_radius, dual_bonus): None
             for threshold in self.candidate_probabilities
             for min_hits in self.candidate_min_hits
             for lidar_growth in self.candidate_lidar_growths
+            for near_field_radius in self.candidate_near_field_radii
+            for dual_bonus in self.candidate_dual_bonuses
         }
         if self.adaptive_min_probability_enable and self.candidate_probabilities:
             center_index = len(self.candidate_probabilities) // 2
             self.current_min_probability = float(self.candidate_probabilities[center_index])
         else:
             self.current_min_probability = float(self.min_probability)
-        self.current_near_field_radius = float(self.near_field_radius)
+        if self.adaptive_near_field_radius_enable and self.candidate_near_field_radii:
+            center_index = len(self.candidate_near_field_radii) // 2
+            self.current_near_field_radius = float(
+                self.candidate_near_field_radii[center_index]
+            )
+        else:
+            self.current_near_field_radius = float(self.near_field_radius)
         if self.adaptive_min_hits_enable and self.candidate_min_hits:
             center_index = len(self.candidate_min_hits) // 2
             self.current_min_hits = int(self.candidate_min_hits[center_index])
@@ -271,7 +296,8 @@ class LidarDepthFusionNode(Node):
         self.get_logger().info(
             f"Fusion node ready. depth={self.depth_cloud_topic} "
             f"lidar={self.lidar_cloud_topic} out={self.output_topic} "
-            f"frame={self.output_frame}"
+            f"frame={self.output_frame} "
+            f"near_radius_candidates={self.candidate_near_field_radii}"
         )
 
     def odom_callback(self, msg: Odometry) -> None:
@@ -529,6 +555,7 @@ class LidarDepthFusionNode(Node):
             and not self.adaptive_min_hits_enable
             and not self.adaptive_lidar_growth_enable
             and not self.adaptive_dual_bonus_enable
+            and not self.adaptive_near_field_radius_enable
         ):
             return fusion_state
         if not self.have_global or self.global_keys.size == 0:
@@ -554,99 +581,145 @@ class LidarDepthFusionNode(Node):
         best_probability = self.current_min_probability
         best_min_hits = self.current_min_hits
         best_lidar_growth = self.current_lidar_growth
+        best_near_field_radius = self.current_near_field_radius
+        best_dual_bonus = self.current_dual_bonus
         best_fusion_state = fusion_state
         best_score = None
         current_candidate = (
             round(self.current_min_probability, 4),
             int(self.current_min_hits),
             round(self.current_lidar_growth, 4),
+            round(self.current_near_field_radius, 4),
+            round(self.current_dual_bonus, 4),
         )
 
-        def candidate_distance(probability: float, min_hits: int, lidar_growth: float) -> float:
+        def candidate_distance(
+            probability: float,
+            min_hits: int,
+            lidar_growth: float,
+            near_field_radius: float,
+            dual_bonus: float,
+        ) -> float:
             return abs(probability - self.current_min_probability) + 0.25 * abs(
                 min_hits - self.current_min_hits
+            ) + 0.10 * abs(
+                lidar_growth - self.current_lidar_growth
+            ) + 0.05 * abs(
+                near_field_radius - self.current_near_field_radius
+            ) + 0.15 * abs(
+                dual_bonus - self.current_dual_bonus
             )
 
-        fusion_states_by_growth: dict[float, dict] = {
-            round(float(fusion_state["lidar_growth"]), 4): fusion_state
+        fusion_states_by_shape: dict[Tuple[float, float], dict] = {
+            (
+                round(float(fusion_state["lidar_growth"]), 4),
+                round(float(fusion_state["near_field_radius"]), 4),
+            ): fusion_state
         }
 
-        for lidar_growth in self.candidate_lidar_growths:
-            growth_key = round(float(lidar_growth), 4)
-            candidate_state = fusion_states_by_growth.get(growth_key)
-            if candidate_state is None:
-                candidate_state = self.compute_fusion_output(
-                    fusion_state["depth_state"],
-                    fusion_state["lidar_state"],
-                    self.current_near_field_radius,
-                    float(lidar_growth),
-                )
-                candidate_state["depth_state"] = fusion_state["depth_state"]
-                candidate_state["lidar_state"] = fusion_state["lidar_state"]
-                candidate_state["depth_points"] = fusion_state["depth_points"]
-                candidate_state["lidar_points"] = fusion_state["lidar_points"]
-                candidate_state["near_field_radius"] = float(self.current_near_field_radius)
-                candidate_state["lidar_growth"] = float(lidar_growth)
-                fusion_states_by_growth[growth_key] = candidate_state
-
-            voxel_probabilities = candidate_state.get("voxel_probabilities", {})
-            voxel_hits = candidate_state.get("voxel_hits", {})
-            voxels = candidate_state["voxels"]
-
-            for min_hits in self.candidate_min_hits:
-                for threshold in self.candidate_probabilities:
-                    predicted = {
-                        key
-                        for key, probability in voxel_probabilities.items()
-                        if self.effective_probability(
-                            float(probability), voxels[key], self.current_dual_bonus
-                        )
-                        >= threshold
-                        and int(voxel_hits.get(key, 0)) >= min_hits
-                    }
-                    predicted = self.limit_keys_to_eval_range(predicted)
-                    scores = self.compute_scores(predicted, gt_keys)
-                    gain_recall = scores.recall - best_single_recall
-                    gain_f1 = scores.f1 - best_single_f1
-                    utility = gain_f1 + 0.35 * gain_recall
-                    if self.adaptive_retention_enable:
-                        retention_ratio = len(predicted) / max(1, candidate_state["candidate_voxels"])
-                        deviation = abs(retention_ratio - self.adaptive_target_retention)
-                        if deviation <= self.adaptive_retention_band:
-                            band_center = max(1e-3, self.adaptive_retention_band)
-                            retention_bonus = 1.0 - deviation / band_center
-                            utility += 0.03 * retention_bonus
-                        else:
-                            retention_penalty = (
-                                deviation - self.adaptive_retention_band
-                            ) / max(1e-3, 1.0 - self.adaptive_retention_band)
-                            utility -= 0.12 * retention_penalty
-                    candidate_key = (round(threshold, 4), int(min_hits), growth_key)
-                    previous = self.candidate_scores[candidate_key]
-                    ema_score = (
-                        utility
-                        if previous is None
-                        else (1.0 - self.adaptive_score_alpha) * previous
-                        + self.adaptive_score_alpha * utility
+        for near_field_radius in self.candidate_near_field_radii:
+            radius_key = round(float(near_field_radius), 4)
+            radius_penalty = 0.0015 * abs(float(near_field_radius) - self.near_field_radius)
+            for lidar_growth in self.candidate_lidar_growths:
+                growth_key = round(float(lidar_growth), 4)
+                state_key = (growth_key, radius_key)
+                candidate_state = fusion_states_by_shape.get(state_key)
+                if candidate_state is None:
+                    candidate_state = self.compute_fusion_output(
+                        fusion_state["depth_state"],
+                        fusion_state["lidar_state"],
+                        float(near_field_radius),
+                        float(lidar_growth),
                     )
-                    self.candidate_scores[candidate_key] = ema_score
-                    if best_score is None or ema_score > best_score + 1e-9:
-                        best_score = ema_score
-                        best_probability = threshold
-                        best_min_hits = int(min_hits)
-                        best_lidar_growth = float(lidar_growth)
-                        best_fusion_state = candidate_state
-                    elif best_score is not None and abs(ema_score - best_score) <= 1e-9:
-                        best_distance = candidate_distance(
-                            best_probability,
-                            best_min_hits,
-                            best_lidar_growth,
-                        )
-                        if candidate_distance(threshold, min_hits, float(lidar_growth)) < best_distance:
-                            best_probability = threshold
-                            best_min_hits = int(min_hits)
-                            best_lidar_growth = float(lidar_growth)
-                            best_fusion_state = candidate_state
+                    candidate_state["depth_state"] = fusion_state["depth_state"]
+                    candidate_state["lidar_state"] = fusion_state["lidar_state"]
+                    candidate_state["depth_points"] = fusion_state["depth_points"]
+                    candidate_state["lidar_points"] = fusion_state["lidar_points"]
+                    candidate_state["near_field_radius"] = float(near_field_radius)
+                    candidate_state["lidar_growth"] = float(lidar_growth)
+                    fusion_states_by_shape[state_key] = candidate_state
+
+                voxel_probabilities = candidate_state.get("voxel_probabilities", {})
+                voxel_hits = candidate_state.get("voxel_hits", {})
+                voxels = candidate_state["voxels"]
+
+                for dual_bonus in self.candidate_dual_bonuses:
+                    dual_key = round(float(dual_bonus), 4)
+                    for min_hits in self.candidate_min_hits:
+                        for threshold in self.candidate_probabilities:
+                            predicted = {
+                                key
+                                for key, probability in voxel_probabilities.items()
+                                if self.effective_probability(
+                                    float(probability), voxels[key], float(dual_bonus)
+                                )
+                                >= threshold
+                                and int(voxel_hits.get(key, 0)) >= min_hits
+                            }
+                            predicted = self.limit_keys_to_eval_range(predicted)
+                            scores = self.compute_scores(predicted, gt_keys)
+                            gain_recall = scores.recall - best_single_recall
+                            gain_f1 = scores.f1 - best_single_f1
+                            utility = gain_f1 + 0.35 * gain_recall - radius_penalty
+                            if self.adaptive_retention_enable:
+                                retention_ratio = len(predicted) / max(1, candidate_state["candidate_voxels"])
+                                deviation = abs(retention_ratio - self.adaptive_target_retention)
+                                if deviation <= self.adaptive_retention_band:
+                                    band_center = max(1e-3, self.adaptive_retention_band)
+                                    retention_bonus = 1.0 - deviation / band_center
+                                    utility += 0.03 * retention_bonus
+                                else:
+                                    retention_penalty = (
+                                        deviation - self.adaptive_retention_band
+                                    ) / max(1e-3, 1.0 - self.adaptive_retention_band)
+                                    utility -= 0.12 * retention_penalty
+                            candidate_key = (
+                                round(threshold, 4),
+                                int(min_hits),
+                                growth_key,
+                                radius_key,
+                                dual_key,
+                            )
+                            previous = self.candidate_scores[candidate_key]
+                            ema_score = (
+                                utility
+                                if previous is None
+                                else (1.0 - self.adaptive_score_alpha) * previous
+                                + self.adaptive_score_alpha * utility
+                            )
+                            self.candidate_scores[candidate_key] = ema_score
+                            if best_score is None or ema_score > best_score + 1e-9:
+                                best_score = ema_score
+                                best_probability = threshold
+                                best_min_hits = int(min_hits)
+                                best_lidar_growth = float(lidar_growth)
+                                best_near_field_radius = float(near_field_radius)
+                                best_dual_bonus = float(dual_bonus)
+                                best_fusion_state = candidate_state
+                            elif best_score is not None and abs(ema_score - best_score) <= 1e-9:
+                                best_distance = candidate_distance(
+                                    best_probability,
+                                    best_min_hits,
+                                    best_lidar_growth,
+                                    best_near_field_radius,
+                                    best_dual_bonus,
+                                )
+                                if (
+                                    candidate_distance(
+                                        threshold,
+                                        min_hits,
+                                        float(lidar_growth),
+                                        float(near_field_radius),
+                                        float(dual_bonus),
+                                    )
+                                    < best_distance
+                                ):
+                                    best_probability = threshold
+                                    best_min_hits = int(min_hits)
+                                    best_lidar_growth = float(lidar_growth)
+                                    best_near_field_radius = float(near_field_radius)
+                                    best_dual_bonus = float(dual_bonus)
+                                    best_fusion_state = candidate_state
 
         current_score = self.candidate_scores.get(current_candidate)
         if (
@@ -657,15 +730,21 @@ class LidarDepthFusionNode(Node):
             best_probability = self.current_min_probability
             best_min_hits = self.current_min_hits
             best_lidar_growth = self.current_lidar_growth
-            best_fusion_state = fusion_states_by_growth.get(
-                round(self.current_lidar_growth, 4), fusion_state
+            best_near_field_radius = self.current_near_field_radius
+            best_dual_bonus = self.current_dual_bonus
+            best_fusion_state = fusion_states_by_shape.get(
+                (
+                    round(self.current_lidar_growth, 4),
+                    round(self.current_near_field_radius, 4),
+                ),
+                fusion_state,
             )
 
         self.current_min_probability = float(best_probability)
         self.current_min_hits = int(best_min_hits)
         self.current_lidar_growth = float(best_lidar_growth)
-        if self.adaptive_dual_bonus_enable:
-            self.current_dual_bonus = self.choose_dual_bonus(best_fusion_state)
+        self.current_near_field_radius = float(best_near_field_radius)
+        self.current_dual_bonus = float(best_dual_bonus)
         return best_fusion_state
 
     def build_probability_candidates(self) -> list[float]:
@@ -693,6 +772,16 @@ class LidarDepthFusionNode(Node):
             self.adaptive_lidar_growth_max,
             self.adaptive_lidar_growth_step,
             self.lidar_growth,
+        )
+
+    def build_near_field_radius_candidates(self) -> list[float]:
+        if not self.adaptive_near_field_radius_enable:
+            return [round(self.near_field_radius, 4)]
+        return self.build_candidate_values(
+            self.adaptive_near_field_radius_min,
+            self.adaptive_near_field_radius_max,
+            self.adaptive_near_field_radius_step,
+            self.near_field_radius,
         )
 
     def build_dual_bonus_candidates(self) -> list[float]:
