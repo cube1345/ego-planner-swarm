@@ -16,10 +16,13 @@ Algorithm choice:
 
 from __future__ import annotations
 
+import json
 import math
+import time
+from collections import deque
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, Set, Tuple
+from typing import Deque, Dict, Iterable, Set, Tuple
 
 import message_filters
 import numpy as np
@@ -28,6 +31,7 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
+from std_msgs.msg import String
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
@@ -117,6 +121,15 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("adaptive_eval_range", 10.0)
         self.declare_parameter("adaptive_min_gt_voxels", 40)
         self.declare_parameter("adaptive_score_alpha", 0.35)
+        self.declare_parameter("closed_loop_feedback_enable", False)
+        self.declare_parameter("closed_loop_feedback_topic", "/drone_0_fusion/closed_loop_feedback")
+        self.declare_parameter("closed_loop_feedback_weight", 0.05)
+        self.declare_parameter("closed_loop_feedback_alpha", 0.25)
+        self.declare_parameter("closed_loop_optimizer_enable", True)
+        self.declare_parameter("closed_loop_local_score_weight", 1.0)
+        self.declare_parameter("closed_loop_candidate_score_alpha", 0.30)
+        self.declare_parameter("closed_loop_action_delay_sec", 3.0)
+        self.declare_parameter("closed_loop_action_history_sec", 20.0)
         self.declare_parameter("sync_queue", 10)
         self.declare_parameter("sync_slop", 0.08)
         self.declare_parameter("publish_debug_stats_every", 20)
@@ -223,6 +236,34 @@ class LidarDepthFusionNode(Node):
         self.adaptive_eval_range = float(self.get_parameter("adaptive_eval_range").value)
         self.adaptive_min_gt_voxels = int(self.get_parameter("adaptive_min_gt_voxels").value)
         self.adaptive_score_alpha = float(self.get_parameter("adaptive_score_alpha").value)
+        self.closed_loop_feedback_enable = bool(
+            self.get_parameter("closed_loop_feedback_enable").value
+        )
+        self.closed_loop_feedback_topic = str(
+            self.get_parameter("closed_loop_feedback_topic").value
+        )
+        self.closed_loop_feedback_weight = float(
+            self.get_parameter("closed_loop_feedback_weight").value
+        )
+        self.closed_loop_feedback_alpha = float(
+            self.get_parameter("closed_loop_feedback_alpha").value
+        )
+        self.closed_loop_optimizer_enable = bool(
+            self.get_parameter("closed_loop_optimizer_enable").value
+        )
+        self.closed_loop_local_score_weight = float(
+            self.get_parameter("closed_loop_local_score_weight").value
+        )
+        self.closed_loop_candidate_score_alpha = float(
+            self.get_parameter("closed_loop_candidate_score_alpha").value
+        )
+        self.closed_loop_action_delay_sec = max(
+            0.0, float(self.get_parameter("closed_loop_action_delay_sec").value)
+        )
+        self.closed_loop_action_history_sec = max(
+            self.closed_loop_action_delay_sec + 1.0,
+            float(self.get_parameter("closed_loop_action_history_sec").value),
+        )
         sync_queue = int(self.get_parameter("sync_queue").value)
         sync_slop = float(self.get_parameter("sync_slop").value)
         self.debug_period = int(self.get_parameter("publish_debug_stats_every").value)
@@ -278,9 +319,20 @@ class LidarDepthFusionNode(Node):
         self.frame_count = 0
         self.global_keys = np.empty((0, 3), dtype=np.int32)
         self.global_centers = np.empty((0, 3), dtype=np.float32)
+        self.closed_loop_score_ema = 0.0
+        self.closed_loop_feedback_ready = False
+        self.closed_loop_candidate_scores: dict[Tuple[float, int, float, float, float], float] = {}
+        self.closed_loop_action_history: Deque[
+            tuple[float, Tuple[float, int, float, float, float]]
+        ] = deque()
+        self.record_current_candidate_action()
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 20)
         self.create_subscription(PointCloud2, self.global_cloud_topic, self.global_cloud_callback, 10)
+        if self.closed_loop_feedback_enable:
+            self.create_subscription(
+                String, self.closed_loop_feedback_topic, self.closed_loop_feedback_callback, 10
+            )
         self.fused_pub = self.create_publisher(PointCloud2, self.output_topic, 10)
 
         self.depth_sub = message_filters.Subscriber(self, PointCloud2, self.depth_cloud_topic)
@@ -297,7 +349,10 @@ class LidarDepthFusionNode(Node):
             f"Fusion node ready. depth={self.depth_cloud_topic} "
             f"lidar={self.lidar_cloud_topic} out={self.output_topic} "
             f"frame={self.output_frame} "
-            f"near_radius_candidates={self.candidate_near_field_radii}"
+            f"near_radius_candidates={self.candidate_near_field_radii} "
+            f"closed_loop_feedback={self.closed_loop_feedback_enable} "
+            f"closed_loop_optimizer={self.closed_loop_optimizer_enable} "
+            f"action_delay_sec={self.closed_loop_action_delay_sec:.2f}"
         )
 
     def odom_callback(self, msg: Odometry) -> None:
@@ -307,6 +362,77 @@ class LidarDepthFusionNode(Node):
             msg.pose.pose.position.z,
         ]
         self.have_odom = True
+
+    def closed_loop_feedback_callback(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except json.JSONDecodeError:
+            return
+        score = payload.get("closed_loop_score_ema", payload.get("closed_loop_score"))
+        try:
+            score_value = float(score)
+        except (TypeError, ValueError):
+            return
+        if not math.isfinite(score_value):
+            return
+        if not self.closed_loop_feedback_ready:
+            self.closed_loop_score_ema = score_value
+            self.closed_loop_feedback_ready = True
+            self.update_closed_loop_candidate_score(score_value, time.time())
+            return
+        alpha = min(1.0, max(0.0, self.closed_loop_feedback_alpha))
+        self.closed_loop_score_ema = (
+            (1.0 - alpha) * self.closed_loop_score_ema + alpha * score_value
+        )
+        self.update_closed_loop_candidate_score(score_value, time.time())
+
+    def update_closed_loop_candidate_score(self, score_value: float, now: float) -> None:
+        if not self.closed_loop_optimizer_enable:
+            return
+        candidate_key = self.lookup_delayed_candidate_key(now - self.closed_loop_action_delay_sec)
+        if candidate_key is None:
+            return
+        previous = self.closed_loop_candidate_scores.get(candidate_key)
+        alpha = min(1.0, max(0.0, self.closed_loop_candidate_score_alpha))
+        if previous is None:
+            self.closed_loop_candidate_scores[candidate_key] = score_value
+        else:
+            self.closed_loop_candidate_scores[candidate_key] = (
+                (1.0 - alpha) * previous + alpha * score_value
+            )
+
+    def record_current_candidate_action(self) -> None:
+        if not self.closed_loop_optimizer_enable:
+            return
+        now = time.time()
+        candidate_key = self.current_candidate_key()
+        if self.closed_loop_action_history and self.closed_loop_action_history[-1][1] == candidate_key:
+            return
+        self.closed_loop_action_history.append((now, candidate_key))
+        cutoff = now - self.closed_loop_action_history_sec
+        while self.closed_loop_action_history and self.closed_loop_action_history[0][0] < cutoff:
+            self.closed_loop_action_history.popleft()
+
+    def lookup_delayed_candidate_key(
+        self, target_time: float
+    ) -> Tuple[float, int, float, float, float] | None:
+        if not self.closed_loop_action_history:
+            return None
+        delayed_key = self.closed_loop_action_history[0][1]
+        for action_time, candidate_key in self.closed_loop_action_history:
+            if action_time > target_time:
+                break
+            delayed_key = candidate_key
+        return delayed_key
+
+    def current_candidate_key(self) -> Tuple[float, int, float, float, float]:
+        return (
+            round(float(self.current_min_probability), 4),
+            int(self.current_min_hits),
+            round(float(self.current_lidar_growth), 4),
+            round(float(self.current_near_field_radius), 4),
+            round(float(self.current_dual_bonus), 4),
+        )
 
     def global_cloud_callback(self, msg: PointCloud2) -> None:
         points = self.cloud_to_xyz(msg)
@@ -660,7 +786,16 @@ class LidarDepthFusionNode(Node):
                             scores = self.compute_scores(predicted, gt_keys)
                             gain_recall = scores.recall - best_single_recall
                             gain_f1 = scores.f1 - best_single_f1
-                            utility = gain_f1 + 0.35 * gain_recall - radius_penalty
+                            local_utility = gain_f1 + 0.35 * gain_recall - radius_penalty
+                            candidate_key = (
+                                round(threshold, 4),
+                                int(min_hits),
+                                growth_key,
+                                radius_key,
+                                dual_key,
+                            )
+                            utility = self.closed_loop_local_score_weight * local_utility
+                            utility += self.closed_loop_candidate_bonus(candidate_key)
                             if self.adaptive_retention_enable:
                                 retention_ratio = len(predicted) / max(1, candidate_state["candidate_voxels"])
                                 deviation = abs(retention_ratio - self.adaptive_target_retention)
@@ -673,13 +808,6 @@ class LidarDepthFusionNode(Node):
                                         deviation - self.adaptive_retention_band
                                     ) / max(1e-3, 1.0 - self.adaptive_retention_band)
                                     utility -= 0.12 * retention_penalty
-                            candidate_key = (
-                                round(threshold, 4),
-                                int(min_hits),
-                                growth_key,
-                                radius_key,
-                                dual_key,
-                            )
                             previous = self.candidate_scores[candidate_key]
                             ema_score = (
                                 utility
@@ -745,7 +873,23 @@ class LidarDepthFusionNode(Node):
         self.current_lidar_growth = float(best_lidar_growth)
         self.current_near_field_radius = float(best_near_field_radius)
         self.current_dual_bonus = float(best_dual_bonus)
+        self.record_current_candidate_action()
         return best_fusion_state
+
+    def closed_loop_candidate_bonus(
+        self, candidate_key: Tuple[float, int, float, float, float]
+    ) -> float:
+        if (
+            not self.closed_loop_feedback_enable
+            or not self.closed_loop_optimizer_enable
+            or not self.closed_loop_feedback_ready
+            or self.closed_loop_feedback_weight <= 0.0
+        ):
+            return 0.0
+        candidate_score = self.closed_loop_candidate_scores.get(candidate_key)
+        if candidate_score is None:
+            return 0.0
+        return self.closed_loop_feedback_weight * candidate_score
 
     def build_probability_candidates(self) -> list[float]:
         if not self.adaptive_min_probability_enable:
@@ -967,7 +1111,8 @@ def main() -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

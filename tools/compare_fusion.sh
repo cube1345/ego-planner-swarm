@@ -50,6 +50,14 @@ ADAPTIVE_DUAL_BONUS_STEP="0.1"
 ADAPTIVE_EVAL_RANGE="10.0"
 ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
+CLOSED_LOOP_FEEDBACK_ENABLE="True"
+CLOSED_LOOP_FEEDBACK_WEIGHT="0.05"
+CLOSED_LOOP_OPTIMIZER_ENABLE="False"
+CLOSED_LOOP_LOCAL_SCORE_WEIGHT="1.0"
+CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="0.30"
+CLOSED_LOOP_ACTION_DELAY_SEC="3.0"
+CLOSED_LOOP_ACTION_HISTORY_SEC="20.0"
+CLOSED_LOOP_WINDOW_SEC="8.0"
 INIT_X="-15.0"
 INIT_Y="0.0"
 INIT_Z="0.1"
@@ -108,6 +116,14 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-eval-range FLOAT
   --adaptive-min-gt-voxels INT
   --adaptive-score-alpha FLOAT
+  --closed-loop-feedback-enable True|False
+  --closed-loop-feedback-weight FLOAT
+  --closed-loop-optimizer-enable True|False
+  --closed-loop-local-score-weight FLOAT
+  --closed-loop-candidate-score-alpha FLOAT
+  --closed-loop-action-delay-sec FLOAT
+  --closed-loop-action-history-sec FLOAT
+  --closed-loop-window-sec FLOAT
   --init-x FLOAT
   --init-y FLOAT
   --init-z FLOAT
@@ -166,6 +182,14 @@ while [[ $# -gt 0 ]]; do
     --adaptive-eval-range) ADAPTIVE_EVAL_RANGE="$2"; shift 2 ;;
     --adaptive-min-gt-voxels) ADAPTIVE_MIN_GT_VOXELS="$2"; shift 2 ;;
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
+    --closed-loop-feedback-enable) CLOSED_LOOP_FEEDBACK_ENABLE="$2"; shift 2 ;;
+    --closed-loop-feedback-weight) CLOSED_LOOP_FEEDBACK_WEIGHT="$2"; shift 2 ;;
+    --closed-loop-optimizer-enable) CLOSED_LOOP_OPTIMIZER_ENABLE="$2"; shift 2 ;;
+    --closed-loop-local-score-weight) CLOSED_LOOP_LOCAL_SCORE_WEIGHT="$2"; shift 2 ;;
+    --closed-loop-candidate-score-alpha) CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="$2"; shift 2 ;;
+    --closed-loop-action-delay-sec) CLOSED_LOOP_ACTION_DELAY_SEC="$2"; shift 2 ;;
+    --closed-loop-action-history-sec) CLOSED_LOOP_ACTION_HISTORY_SEC="$2"; shift 2 ;;
+    --closed-loop-window-sec) CLOSED_LOOP_WINDOW_SEC="$2"; shift 2 ;;
     --init-x) INIT_X="$2"; shift 2 ;;
     --init-y) INIT_Y="$2"; shift 2 ;;
     --init-z) INIT_Z="$2"; shift 2 ;;
@@ -186,6 +210,7 @@ mkdir -p "$OUT_DIR"
 
 CSV_PATH="$OUT_DIR/${LABEL}.csv"
 SUMMARY_PATH="$OUT_DIR/${LABEL}.summary.json"
+CLOSED_LOOP_PATH="$OUT_DIR/${LABEL}.closed_loop.json"
 LAUNCH_LOG="$OUT_DIR/${LABEL}.launch.log"
 REPORT_LOG="$OUT_DIR/${LABEL}.report.log"
 RUN_LOG_DIR="$OUT_DIR/${LABEL}_ros_logs"
@@ -251,7 +276,7 @@ set -u
 
 cleanup_existing_ros_processes
 
-rm -f "$CSV_PATH" "$SUMMARY_PATH" "$LAUNCH_LOG" "$REPORT_LOG" "$SIM_STATS_LOG"
+rm -f "$CSV_PATH" "$SUMMARY_PATH" "$CLOSED_LOOP_PATH" "$LAUNCH_LOG" "$REPORT_LOG" "$SIM_STATS_LOG"
 rm -rf "$SIM_STATS_DIR"
 rm -rf "$RUN_LOG_DIR"
 mkdir -p "$RUN_LOG_DIR"
@@ -308,6 +333,14 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   adaptive_eval_range:="$ADAPTIVE_EVAL_RANGE" \
   adaptive_min_gt_voxels:="$ADAPTIVE_MIN_GT_VOXELS" \
   adaptive_score_alpha:="$ADAPTIVE_SCORE_ALPHA" \
+  closed_loop_feedback_enable:="$CLOSED_LOOP_FEEDBACK_ENABLE" \
+  closed_loop_feedback_weight:="$CLOSED_LOOP_FEEDBACK_WEIGHT" \
+  closed_loop_optimizer_enable:="$CLOSED_LOOP_OPTIMIZER_ENABLE" \
+  closed_loop_local_score_weight:="$CLOSED_LOOP_LOCAL_SCORE_WEIGHT" \
+  closed_loop_candidate_score_alpha:="$CLOSED_LOOP_CANDIDATE_SCORE_ALPHA" \
+  closed_loop_action_delay_sec:="$CLOSED_LOOP_ACTION_DELAY_SEC" \
+  closed_loop_action_history_sec:="$CLOSED_LOOP_ACTION_HISTORY_SEC" \
+  closed_loop_window_sec:="$CLOSED_LOOP_WINDOW_SEC" \
   >"$LAUNCH_LOG" 2>&1 &
 LAUNCH_PID=$!
 
@@ -410,3 +443,14 @@ summary["positive_ratio_f1_gain"] = positive_ratio("fusion_f1_gain_vs_best_singl
 summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 print(json.dumps(summary, indent=2, ensure_ascii=False))
 PY
+
+SIM_SUMMARY_PATH="$SIM_STATS_DIR/sim_stats_summary.json"
+if [[ -s "$SIM_SUMMARY_PATH" ]]; then
+  /usr/bin/python3 tools/closed_loop_score.py \
+    --fusion-summary "$SUMMARY_PATH" \
+    --sim-summary "$SIM_SUMMARY_PATH" \
+    --output "$CLOSED_LOOP_PATH" \
+    --update-fusion-summary
+else
+  echo "[compare_fusion] sim stats summary not generated: $SIM_SUMMARY_PATH" >&2
+fi

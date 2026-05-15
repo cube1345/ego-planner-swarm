@@ -1,6 +1,6 @@
 # EGO-Planner 多模态融合代码说明（ROS 2）
 
-更新时间：2026-05-03
+更新时间：2026-05-13
 
 ## 1. 当前仓库里的融合链路是什么
 
@@ -46,6 +46,8 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
                   | - z/range filter                  |
                   | - voxel evidence fusion           |
                   | - adaptive min_probability        |
+                  | - adaptive min_hits / dual_bonus  |
+                  | - closed-loop score feedback      |
                   +----------------+------------------+
                                    |
                                    v
@@ -72,13 +74,23 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 当前这个启动文件还负责把自适应阈值参数传给融合节点，包括：
 
 - `min_probability`
+- `min_hits`
 - `adaptive_min_probability_enable`
 - `adaptive_min_probability_min`
 - `adaptive_min_probability_max`
 - `adaptive_min_probability_step`
+- `adaptive_min_hits_enable`
+- `adaptive_min_hits_min`
+- `adaptive_min_hits_max`
+- `adaptive_dual_bonus_enable`
+- `adaptive_dual_bonus_min`
+- `adaptive_dual_bonus_max`
+- `adaptive_dual_bonus_step`
 - `adaptive_eval_range`
 - `adaptive_min_gt_voxels`
 - `adaptive_score_alpha`
+- `closed_loop_feedback_enable`
+- `closed_loop_feedback_weight`
 
 ### 3.2 非融合原版链路
 
@@ -143,39 +155,49 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 
 ## 5. 当前在线自适应参数到底有几个
 
-当前真正在线自适应的参数只有一个：
+当前默认真正在线自适应的参数有三个：
 
 - `current_min_probability`
+- `current_min_hits`
+- `current_dual_bonus`
 
-它的静态基准值来自：
+它们的静态基准值来自：
 
 - `min_probability`
+- `min_hits`
+- `adaptive_dual_bonus_min ~ adaptive_dual_bonus_max`
 
-它的候选搜索空间由以下参数控制：
+它们的候选搜索空间由以下参数控制：
 
 - `adaptive_min_probability_min`
 - `adaptive_min_probability_max`
 - `adaptive_min_probability_step`
+- `adaptive_min_hits_min`
+- `adaptive_min_hits_max`
+- `adaptive_dual_bonus_min`
+- `adaptive_dual_bonus_max`
+- `adaptive_dual_bonus_step`
 
 ### 5.1 自适应流程
 
 每次同步回调内都会调用：
 
-- `auto_tune_min_probability()`
+- `auto_tune_parameters()`
 
 流程如下：
 
 1. 从 `/map_generator/global_cloud` 里取无人机附近的局部 GT 体素
 2. 计算当前 depth-only 和 lidar-only 的局部指标
-3. 在候选阈值区间内枚举多个 `min_probability`
-4. 对每个候选阈值生成一份预测障碍集合
-5. 计算候选阈值相对最佳单传感器的收益：
+3. 枚举 `min_probability`、`min_hits`、`dual_bonus` 的候选组合
+4. 对每个候选组合生成一份预测障碍集合
+5. 计算候选组合相对最佳单传感器的收益：
    - `gain_recall`
    - `gain_f1`
 6. 定义目标函数：
    - `utility = gain_f1 + 0.35 * gain_recall`
 7. 对每个候选 utility 做 EMA 平滑
-8. 取最高分阈值作为当前帧 `current_min_probability`
+8. 若 closed-loop feedback 可用，则对候选评分加入较小权重的闭环修正
+9. 取最高分候选作为当前帧的 `current_min_probability`、`current_min_hits` 和 `current_dual_bonus`
 
 ### 5.2 哪些参数只是“控制自适应过程”
 
@@ -185,18 +207,24 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 - `adaptive_eval_range`
 - `adaptive_min_gt_voxels`
 - `adaptive_score_alpha`
+- `closed_loop_feedback_weight`
 
-### 5.3 当前未真正用上的参数
+### 5.3 当前试验后不默认启用的参数
 
-代码里还声明了：
+代码里还声明或实现了：
 
 - `adaptive_target_retention`
 - `adaptive_retention_band`
+- `adaptive_lidar_growth_enable`
+- `adaptive_z_max_enable`
+- `adaptive_depth_decay_enable`
+- `adaptive_near_field_radius_enable`
 
-但当前版本它们没有进入 `auto_tune_min_probability()` 的实际决策路径。  
-也就是说，现阶段真正生效的自适应方向仍然只有一个：
+其中 `adaptive_lidar_growth`、`adaptive_z_max` 和过宽 `adaptive_near_field_radius` 已经做过 batch 评估，但当前指标不支持默认启用。也就是说，当前默认保留的是：
 
 - 融合层障碍接受阈值 `min_probability`
+- 体素命中门限 `min_hits`
+- 双传感器一致性奖励 `dual_bonus`
 
 ## 6. 为什么要有 `force_zero_stamp`
 
@@ -271,12 +299,15 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 
 - 几何层融合
 - 体素证据融合
-- 单参数在线自适应
+- 三参数在线自适应
+- 感知-规划闭环反馈修正
 
 它增强的是 planner 的局部地图输入质量，而不是直接改 planner 优化器本身。
 
-当前真正在线自适应的参数只有一个：
+当前默认真正在线自适应的参数有三个：
 
 - `min_probability`
+- `min_hits`
+- `dual_bonus`
 
 这也是当前文档、仿真链路和 headless 评测里都应统一遵守的工程事实。

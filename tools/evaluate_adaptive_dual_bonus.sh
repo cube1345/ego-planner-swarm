@@ -93,6 +93,7 @@ comparison = {
         "fusion_f1_gain_vs_best_single": on_data["fusion_f1_gain_vs_best_single"] - off_data["fusion_f1_gain_vs_best_single"],
         "positive_ratio_recall_gain": on_data["positive_ratio_recall_gain"] - off_data["positive_ratio_recall_gain"],
         "positive_ratio_f1_gain": on_data["positive_ratio_f1_gain"] - off_data["positive_ratio_f1_gain"],
+        "closed_loop_score": on_data.get("closed_loop", {}).get("closed_loop_score", 0.0) - off_data.get("closed_loop", {}).get("closed_loop_score", 0.0),
     },
 }
 
@@ -100,14 +101,21 @@ delta_f1 = comparison["delta"]["fusion_f1"]
 delta_recall = comparison["delta"]["fusion_recall"]
 delta_f1_gain = comparison["delta"]["fusion_f1_gain_vs_best_single"]
 delta_recall_gain = comparison["delta"]["fusion_recall_gain_vs_best_single"]
+delta_closed_loop = comparison["delta"]["closed_loop_score"]
 if (
-    delta_f1 >= 0.002
-    and delta_recall >= 0.001
-    and delta_f1_gain >= 0.0005
-    and delta_recall_gain >= 0.0005
+    delta_closed_loop >= 0.0005
+    and delta_f1 >= -0.001
+    and delta_recall >= -0.001
+    and delta_f1_gain >= -0.002
+    and delta_recall_gain >= -0.002
 ):
     verdict = "keep"
-elif delta_f1 <= -0.002 or delta_recall <= -0.001 or delta_f1_gain <= -0.002:
+elif (
+    delta_f1 <= -0.002
+    or delta_recall <= -0.001
+    or delta_f1_gain <= -0.002
+    or delta_closed_loop <= -0.0005
+):
     verdict = "disable"
 else:
     verdict = "neutral"

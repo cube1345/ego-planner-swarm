@@ -118,6 +118,7 @@ install(
     scripts/simulated_lidar_cloud.py
     scripts/ros2_lidar_depth_fusion_node.py
     scripts/fusion_benefit_report.py
+    scripts/closed_loop_feedback_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

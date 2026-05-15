@@ -74,6 +74,8 @@ class SimFlightStatsReport(Node):
         self.obstacle_cluster_count = 0
         self.occ_latest_points = 0
         self.occ_peak_points = 0
+        self.occ_point_counts: List[int] = []
+        self.obstacle_centers = np.empty((0, 3), dtype=np.float64)
 
         if args.launch_log_path:
             # The redirected batch launch log starts recording before this node starts.
@@ -87,6 +89,8 @@ class SimFlightStatsReport(Node):
         self.odom_count = 0
         self.path_length = 0.0
         self.max_speed = 0.0
+        self.prev_speed: Optional[float] = None
+        self.accel_samples: List[float] = []
         self.turn_count = 0
         self.last_turn_time: Optional[float] = None
         self.last_heading: Optional[float] = None
@@ -102,6 +106,11 @@ class SimFlightStatsReport(Node):
         self.goal_tol = float(args.goal_tolerance)
         self.goal_exit_margin = float(args.goal_exit_margin)
         self.left_goal_region = False
+        self.min_obstacle_distance = float("inf")
+        self.safety_violation_count = 0
+        self.distance_sample_count = 0
+        self.distance_sample_stride = max(1, int(args.distance_sample_stride))
+        self.safety_radius = float(args.safety_radius)
 
         self.global_sub = self.create_subscription(
             PointCloud2, args.global_cloud_topic, self.global_cloud_callback, 10
@@ -146,6 +155,7 @@ class SimFlightStatsReport(Node):
         }
         self.obstacle_voxel_count = len(keys)
         self.obstacle_cluster_count = estimate_clusters(keys, self.args.min_cluster_voxels)
+        self.obstacle_centers = (unique_np.astype(np.float64) + 0.5) * self.args.obstacle_voxel_size
         self.global_cloud_received = True
 
         self.get_logger().info(
@@ -160,6 +170,7 @@ class SimFlightStatsReport(Node):
         self.occ_latest_points = count
         if count > self.occ_peak_points:
             self.occ_peak_points = count
+        self.occ_point_counts.append(count)
 
     def scan_replan_total(self) -> int:
         if self.args.launch_log_path:
@@ -220,6 +231,9 @@ class SimFlightStatsReport(Node):
             speed = dist / dt
             if speed > self.max_speed:
                 self.max_speed = speed
+            if self.prev_speed is not None:
+                self.accel_samples.append(abs(speed - self.prev_speed) / dt)
+            self.prev_speed = speed
 
             if dist >= self.min_segment_distance:
                 heading = heading_from_points(self.prev_pos, pos)
@@ -245,6 +259,23 @@ class SimFlightStatsReport(Node):
             if self.left_goal_region and dist_to_goal <= self.goal_tol:
                 self.goal_reached_time = now - self.start_wall
 
+        self.update_obstacle_distance(pos)
+
+    def update_obstacle_distance(self, pos: np.ndarray) -> None:
+        if self.obstacle_centers.size == 0:
+            return
+        if self.odom_count % self.distance_sample_stride != 0:
+            return
+        distances = np.linalg.norm(self.obstacle_centers - pos[None, :], axis=1)
+        if distances.size == 0:
+            return
+        nearest = float(np.min(distances))
+        self.distance_sample_count += 1
+        if nearest < self.min_obstacle_distance:
+            self.min_obstacle_distance = nearest
+        if nearest < self.safety_radius:
+            self.safety_violation_count += 1
+
     def on_timer(self) -> None:
         elapsed = time.time() - self.start_wall
         if elapsed - self.last_wall < 5.0:
@@ -265,6 +296,18 @@ class SimFlightStatsReport(Node):
         self.replan_final_total = self.scan_replan_total()
         replan_count = max(0, self.replan_final_total - self.replan_base_total)
         avg_replan_interval = 0.0 if replan_count <= 0 else float(elapsed / max(1, replan_count))
+        adaptive_stats = self.scan_adaptive_parameter_stats()
+        occ_jitter_ratio = self.compute_jitter_ratio(self.occ_point_counts)
+        accel_rms = self.compute_rms(self.accel_samples)
+        min_distance = (
+            None if not math.isfinite(self.min_obstacle_distance) else self.min_obstacle_distance
+        )
+        collision_risk_score = self.compute_collision_risk_score(min_distance)
+        safety_violation_ratio = (
+            0.0
+            if self.distance_sample_count <= 0
+            else self.safety_violation_count / max(1, self.distance_sample_count)
+        )
 
         result = {
             "duration_sec": float(elapsed),
@@ -280,6 +323,17 @@ class SimFlightStatsReport(Node):
             "turn_count": int(self.turn_count),
             "path_length_m": float(self.path_length),
             "max_speed_mps": float(self.max_speed),
+            "accel_rms_mps2": float(accel_rms),
+            "min_obstacle_distance_m": min_distance,
+            "safety_radius_m": float(self.safety_radius),
+            "safety_violation_count": int(self.safety_violation_count),
+            "safety_distance_samples": int(self.distance_sample_count),
+            "safety_violation_ratio": float(safety_violation_ratio),
+            "collision_risk_score": float(collision_risk_score),
+            "occupancy_jitter_ratio": float(occ_jitter_ratio),
+            "adaptive_param_switch_count": int(adaptive_stats["switch_count"]),
+            "adaptive_param_samples": int(adaptive_stats["samples"]),
+            "adaptive_param_switch_rate": float(adaptive_stats["switch_rate"]),
             "goal_reached_time_sec": None
             if self.goal_reached_time is None
             else float(self.goal_reached_time),
@@ -374,6 +428,56 @@ class SimFlightStatsReport(Node):
         )
         path.write_text("\n".join(lines), encoding="utf-8")
 
+    def compute_jitter_ratio(self, values: List[int]) -> float:
+        if len(values) < 2:
+            return 0.0
+        arr = np.asarray(values, dtype=np.float64)
+        mean = float(np.mean(arr))
+        if abs(mean) < 1e-9:
+            return 0.0
+        return float(np.std(arr) / mean)
+
+    def compute_rms(self, values: List[float]) -> float:
+        if not values:
+            return 0.0
+        arr = np.asarray(values, dtype=np.float64)
+        return float(math.sqrt(float(np.mean(arr * arr))))
+
+    def compute_collision_risk_score(self, min_distance: Optional[float]) -> float:
+        if min_distance is None:
+            return 1.0
+        if min_distance >= self.safety_radius:
+            return 0.0
+        return float((self.safety_radius - min_distance) / max(1e-6, self.safety_radius))
+
+    def scan_adaptive_parameter_stats(self) -> Dict[str, float]:
+        launch_log = Path(self.args.launch_log_path)
+        if not launch_log.is_file():
+            return {"samples": 0, "switch_count": 0, "switch_rate": 0.0}
+        try:
+            text = launch_log.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return {"samples": 0, "switch_count": 0, "switch_rate": 0.0}
+        pattern = re.compile(
+            r"min_prob=([0-9.]+).*?near_radius=([0-9.]+).*?"
+            r"lidar_growth=([0-9.]+).*?min_hits=([0-9]+).*?"
+            r"dual_bonus=([0-9.]+).*?z_max=([0-9.]+).*?depth_decay=([0-9.]+)"
+        )
+        samples = [
+            tuple(float(item) for item in match.groups())
+            for match in pattern.finditer(text)
+        ]
+        if len(samples) < 2:
+            return {"samples": len(samples), "switch_count": 0, "switch_rate": 0.0}
+        switch_count = sum(
+            1 for previous, current in zip(samples, samples[1:]) if previous != current
+        )
+        return {
+            "samples": len(samples),
+            "switch_count": switch_count,
+            "switch_rate": switch_count / max(1, len(samples) - 1),
+        }
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect simulation stats for obstacle avoidance run.")
@@ -397,6 +501,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goal-z", type=float, default=1.0)
     parser.add_argument("--goal-tolerance", type=float, default=0.6)
     parser.add_argument("--goal-exit-margin", type=float, default=1.0)
+    parser.add_argument("--safety-radius", type=float, default=0.35)
+    parser.add_argument("--distance-sample-stride", type=int, default=10)
     return parser.parse_args()
 
 

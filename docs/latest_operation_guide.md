@@ -1,6 +1,6 @@
 # Ego-Planner 当前操作指南
 
-更新时间：2026-05-03
+更新时间：2026-05-13
 
 ## 1. 适用范围
 
@@ -97,9 +97,12 @@ ros2 launch ego_planner rviz.launch.py
 
 说明：
 
-- 当前默认已开启自适应 `min_probability`
-- 当前默认搜索区间为 `0.20 ~ 0.35`
-- 当前默认候选步长为 `0.02`
+- 当前默认已开启自适应 `min_probability`、`min_hits`、`dual_bonus`
+- 当前默认已开启 closed-loop feedback 节点
+- sliding-window online optimizer 当前保留为实验开关，默认关闭，因为完整 A/B 测试暂未体现长期正收益
+- closed-loop 默认窗口为 `8.0s`，可通过最近窗口内的路径长度、重规划代理、碰撞风险、加速度 RMS 和地图抖动影响候选参数评分
+- `min_probability` 当前默认搜索区间为 `0.20 ~ 0.35`
+- `min_probability` 当前默认候选步长为 `0.02`
 - 当前演示模式为单目标点、非动态障碍、融合避障
 
 ## 6. 如何判断 RViz 现象正常
@@ -184,11 +187,13 @@ bash tools/compare_fusion.sh \
 
 ## 9. 当前自适应参数说明
 
-当前真正在线自适应的参数只有一个：
+当前默认在线自适应参数有三个：
 
 - `min_probability`
+- `min_hits`
+- `dual_bonus`
 
-其工作方式：
+### 9.1 `min_probability`
 
 - 对每帧同步的 depth / lidar 数据构建共享体素证据表
 - 在 `adaptive_min_probability_min ~ adaptive_min_probability_max` 范围内枚举候选阈值
@@ -198,22 +203,69 @@ bash tools/compare_fusion.sh \
 - 对各候选 utility 做 EMA 平滑
 - 选择得分最高的阈值作为当前帧使用的 `current_min_probability`
 
+### 9.2 `min_hits`
+
+`min_hits` 控制体素至少被命中多少次才进入融合点云。当前默认允许在 `1 ~ 3` 内在线选择，用于在“保留更多障碍候选”和“抑制稀疏噪声”之间动态折中。
+
+### 9.3 `dual_bonus`
+
+`dual_bonus` 用于奖励 depth 与 lidar 同时命中的体素。当前长时段 batch 中，开启后 `fusion_recall` 从 `0.166402` 提升到 `0.169008`，`fusion_f1` 从 `0.285162` 提升到 `0.288916`，因此保留为默认启用方向。
+
+### 9.4 Closed-loop feedback
+
+当前融合节点会订阅：
+
+```text
+/drone_0_fusion/closed_loop_feedback
+```
+
+该反馈把路径长度、重规划、碰撞风险、轨迹平滑度和地图抖动合成为闭环评分。当前它不直接控制无人机运动，而是作为融合候选参数评分的二级修正项。
+
+当前实现已经具备 sliding-window online optimizer，但默认关闭：
+
+- `closed_loop_feedback_node.py` 每秒发布最近 `closed_loop_window_sec` 秒内的窗口指标
+- `ros2_lidar_depth_fusion_node.py` 将窗口 `J` 延迟归因到历史候选组合
+- 候选组合再次被枚举时，会使用该组合自己的 closed-loop EMA 参与评分
+- 这样参数选择会逐步受最近飞行表现影响，而不是只依赖当前帧融合 F1 / Recall
+- `closed_loop_action_delay_sec` 默认 `3.0s`，用于补偿 map / planner / trajectory 执行链路延迟
+
+直接归因版本的完整测试结果显示，策略开启后长期指标下降，因此默认 `closed_loop_optimizer_enable=False`。当前代码已改为延迟归因版本，但仍需完整 batch 复验后才能决定是否默认启用。如需继续实验，可手动传入：
+
+```bash
+closed_loop_optimizer_enable:=True
+```
+
+### 9.5 控制自适应过程的超参数
+
 当前用于控制自适应过程的超参数包括：
 
 - `adaptive_min_probability_enable`
 - `adaptive_min_probability_min`
 - `adaptive_min_probability_max`
 - `adaptive_min_probability_step`
+- `adaptive_min_hits_enable`
+- `adaptive_min_hits_min`
+- `adaptive_min_hits_max`
+- `adaptive_dual_bonus_enable`
+- `adaptive_dual_bonus_min`
+- `adaptive_dual_bonus_max`
+- `adaptive_dual_bonus_step`
+- `closed_loop_feedback_enable`
+- `closed_loop_feedback_weight`
+- `closed_loop_optimizer_enable`
+- `closed_loop_local_score_weight`
+- `closed_loop_candidate_score_alpha`
+- `closed_loop_action_delay_sec`
+- `closed_loop_action_history_sec`
+- `closed_loop_window_sec`
 - `adaptive_score_alpha`
 - `adaptive_eval_range`
 - `adaptive_min_gt_voxels`
 
 说明：
 
-- `adaptive_target_retention`
-- `adaptive_retention_band`
-
-这两个参数当前已声明，但没有真正参与当前在线决策逻辑。
+- `adaptive_lidar_growth`、`adaptive_z_max`、过宽 `adaptive_near_field_radius` 已做过实验，但当前指标不支持默认启用。
+- `adaptive_target_retention`、`adaptive_retention_band` 当前仍主要是实验性控制项，不作为已验证收益点宣传。
 
 ## 10. 停止仿真
 

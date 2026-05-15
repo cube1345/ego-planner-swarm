@@ -66,14 +66,24 @@ def launch_setup(context, *args, **kwargs):
     adaptive_eval_range = LaunchConfiguration('adaptive_eval_range').perform(context)
     adaptive_min_gt_voxels = LaunchConfiguration('adaptive_min_gt_voxels').perform(context)
     adaptive_score_alpha = LaunchConfiguration('adaptive_score_alpha').perform(context)
+    closed_loop_feedback_enable = LaunchConfiguration('closed_loop_feedback_enable').perform(context)
+    closed_loop_feedback_weight = LaunchConfiguration('closed_loop_feedback_weight').perform(context)
+    closed_loop_optimizer_enable = LaunchConfiguration('closed_loop_optimizer_enable').perform(context)
+    closed_loop_local_score_weight = LaunchConfiguration('closed_loop_local_score_weight').perform(context)
+    closed_loop_candidate_score_alpha = LaunchConfiguration('closed_loop_candidate_score_alpha').perform(context)
+    closed_loop_action_delay_sec = LaunchConfiguration('closed_loop_action_delay_sec').perform(context)
+    closed_loop_action_history_sec = LaunchConfiguration('closed_loop_action_history_sec').perform(context)
+    closed_loop_window_sec = LaunchConfiguration('closed_loop_window_sec').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
     fusion_script = os.path.join(pkg_prefix, 'lib', 'ego_planner', 'ros2_lidar_depth_fusion_node.py')
+    feedback_script = os.path.join(pkg_prefix, 'lib', 'ego_planner', 'closed_loop_feedback_node.py')
 
     odom_topic_full = f'/drone_{drone_id}_{odom_topic}'
     lidar_topic_full = f'/drone_{drone_id}_lidar/points'
     fused_topic_full = f'/drone_{drone_id}_fusion/fused_cloud'
+    feedback_topic_full = f'/drone_{drone_id}_fusion/closed_loop_feedback'
     cloud_topic = 'fusion/fused_cloud' if use_fusion_value else 'pcl_render_node/cloud'
 
     map_generator_node = Node(
@@ -267,6 +277,28 @@ def launch_setup(context, *args, **kwargs):
             '-p', f'adaptive_eval_range:={adaptive_eval_range}',
             '-p', f'adaptive_min_gt_voxels:={adaptive_min_gt_voxels}',
             '-p', f'adaptive_score_alpha:={adaptive_score_alpha}',
+            '-p', f'closed_loop_feedback_enable:={closed_loop_feedback_enable}',
+            '-p', f'closed_loop_feedback_topic:={feedback_topic_full}',
+            '-p', f'closed_loop_feedback_weight:={closed_loop_feedback_weight}',
+            '-p', f'closed_loop_optimizer_enable:={closed_loop_optimizer_enable}',
+            '-p', f'closed_loop_local_score_weight:={closed_loop_local_score_weight}',
+            '-p', f'closed_loop_candidate_score_alpha:={closed_loop_candidate_score_alpha}',
+            '-p', f'closed_loop_action_delay_sec:={closed_loop_action_delay_sec}',
+            '-p', f'closed_loop_action_history_sec:={closed_loop_action_history_sec}',
+        ],
+        output='screen',
+        condition=IfCondition(use_fusion),
+    )
+
+    closed_loop_feedback_process = ExecuteProcess(
+        cmd=[
+            fusion_python_executable, feedback_script,
+            '--ros-args',
+            '-p', 'global_cloud_topic:=/map_generator/global_cloud',
+            '-p', f'occupancy_topic:=/drone_{drone_id}_grid/grid_map/occupancy_inflate',
+            '-p', f'odom_topic:={odom_topic_full}',
+            '-p', f'feedback_topic:={feedback_topic_full}',
+            '-p', f'window_sec:={closed_loop_window_sec}',
         ],
         output='screen',
         condition=IfCondition(use_fusion),
@@ -278,6 +310,7 @@ def launch_setup(context, *args, **kwargs):
         advanced_param_include,
         traj_server_node,
         simulated_lidar_node,
+        closed_loop_feedback_process,
         fusion_process,
         simulator_include,
     ]
@@ -341,5 +374,13 @@ def generate_launch_description():
         DeclareLaunchArgument('adaptive_eval_range', default_value='10.0'),
         DeclareLaunchArgument('adaptive_min_gt_voxels', default_value='40'),
         DeclareLaunchArgument('adaptive_score_alpha', default_value='0.35'),
+        DeclareLaunchArgument('closed_loop_feedback_enable', default_value='True'),
+        DeclareLaunchArgument('closed_loop_feedback_weight', default_value='0.05'),
+        DeclareLaunchArgument('closed_loop_optimizer_enable', default_value='False'),
+        DeclareLaunchArgument('closed_loop_local_score_weight', default_value='1.0'),
+        DeclareLaunchArgument('closed_loop_candidate_score_alpha', default_value='0.30'),
+        DeclareLaunchArgument('closed_loop_action_delay_sec', default_value='3.0'),
+        DeclareLaunchArgument('closed_loop_action_history_sec', default_value='20.0'),
+        DeclareLaunchArgument('closed_loop_window_sec', default_value='8.0'),
         OpaqueFunction(function=launch_setup),
     ])
