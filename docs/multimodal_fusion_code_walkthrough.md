@@ -1,6 +1,6 @@
 # EGO-Planner 多模态融合代码说明（ROS 2）
 
-更新时间：2026-05-13
+更新时间：2026-05-15
 
 ## 1. 当前仓库里的融合链路是什么
 
@@ -14,6 +14,7 @@
 输出：
 
 - 融合点云：`/drone_0_fusion/fused_cloud`
+- D-S 证据指标：`/drone_0_fusion/ds_metrics`
 
 规划器最终订阅：
 
@@ -48,6 +49,7 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
                   | - adaptive min_probability        |
                   | - adaptive min_hits / dual_bonus  |
                   | - closed-loop score feedback      |
+                  | - D-S evidence metrics            |
                   +----------------+------------------+
                                    |
                                    v
@@ -91,6 +93,9 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 - `adaptive_score_alpha`
 - `closed_loop_feedback_enable`
 - `closed_loop_feedback_weight`
+- `ds_evidence_enable`
+- `ds_unknown_floor`
+- `ds_free_scale`
 
 ### 3.2 非融合原版链路
 
@@ -152,6 +157,43 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 - 原始点云并集
 - 图像层融合
 - 学习式语义融合
+
+### 4.4 Dempster-Shafer 证据指标层
+
+当前融合节点还实现了 Dempster-Shafer evidence metrics。它不是替代 log-odds 输出层，而是在每个体素上额外计算 depth 与 lidar 的占据质量、空闲质量和未知质量，再通过 D-S 组合规则得到：
+
+- `belief_occupied`
+- `belief_free`
+- `unknown`
+- `conflict`
+
+对应函数：
+
+- `ds_mass_from_probability()`
+- `combine_ds_masses()`
+- `compute_ds_metrics()`
+- `publish_ds_metrics()`
+
+聚合后的在线指标通过以下话题发布：
+
+```text
+/drone_0_fusion/ds_metrics
+```
+
+当前 JSON 字段包括：
+
+- `belief_occupied_mean`
+- `unknown_mean`
+- `conflict_mean`
+- `fused_voxels`
+
+工程含义：
+
+- `belief_occupied_mean` 表示融合输出体素的平均占据置信度
+- `unknown_mean` 表示融合输出中证据不足的比例倾向
+- `conflict_mean` 表示 depth 与 lidar 对同一体素的冲突程度
+
+当前 D-S 层的定位是诊断和后续优化指标层，不改变默认 `/drone_0_fusion/fused_cloud` 的筛选逻辑。
 
 ## 5. 当前在线自适应参数到底有几个
 
@@ -299,6 +341,7 @@ simulated_lidar_cloud.py ----------> /drone_0_lidar/points
 
 - 几何层融合
 - 体素证据融合
+- D-S 证据不确定性指标
 - 三参数在线自适应
 - 感知-规划闭环反馈修正
 

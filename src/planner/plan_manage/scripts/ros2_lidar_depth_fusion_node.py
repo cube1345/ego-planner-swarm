@@ -52,6 +52,12 @@ class VoxelEvidence:
     hits: int = 0
     seen_depth: bool = False
     seen_lidar: bool = False
+    depth_occ_mass: float = 0.0
+    depth_free_mass: float = 0.0
+    depth_unknown_mass: float = 1.0
+    lidar_occ_mass: float = 0.0
+    lidar_free_mass: float = 0.0
+    lidar_unknown_mass: float = 1.0
 
 
 @dataclass
@@ -79,6 +85,7 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("output_topic", "/drone_0_fusion/fused_cloud")
         self.declare_parameter("output_frame", "world")
         self.declare_parameter("global_cloud_topic", "/map_generator/global_cloud")
+        self.declare_parameter("ds_metrics_topic", "/drone_0_fusion/ds_metrics")
         self.declare_parameter("resolution", 0.10)
         self.declare_parameter("z_min", -0.10)
         self.declare_parameter("z_max", 3.50)
@@ -130,6 +137,9 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("closed_loop_candidate_score_alpha", 0.30)
         self.declare_parameter("closed_loop_action_delay_sec", 3.0)
         self.declare_parameter("closed_loop_action_history_sec", 20.0)
+        self.declare_parameter("ds_evidence_enable", True)
+        self.declare_parameter("ds_unknown_floor", 0.10)
+        self.declare_parameter("ds_free_scale", 0.35)
         self.declare_parameter("sync_queue", 10)
         self.declare_parameter("sync_slop", 0.08)
         self.declare_parameter("publish_debug_stats_every", 20)
@@ -140,6 +150,7 @@ class LidarDepthFusionNode(Node):
         self.output_topic = str(self.get_parameter("output_topic").value)
         self.output_frame = str(self.get_parameter("output_frame").value)
         self.global_cloud_topic = str(self.get_parameter("global_cloud_topic").value)
+        self.ds_metrics_topic = str(self.get_parameter("ds_metrics_topic").value)
         self.resolution = float(self.get_parameter("resolution").value)
         self.z_min = float(self.get_parameter("z_min").value)
         self.z_max = float(self.get_parameter("z_max").value)
@@ -264,6 +275,13 @@ class LidarDepthFusionNode(Node):
             self.closed_loop_action_delay_sec + 1.0,
             float(self.get_parameter("closed_loop_action_history_sec").value),
         )
+        self.ds_evidence_enable = bool(self.get_parameter("ds_evidence_enable").value)
+        self.ds_unknown_floor = min(
+            0.95, max(0.0, float(self.get_parameter("ds_unknown_floor").value))
+        )
+        self.ds_free_scale = min(
+            0.95, max(0.0, float(self.get_parameter("ds_free_scale").value))
+        )
         sync_queue = int(self.get_parameter("sync_queue").value)
         sync_slop = float(self.get_parameter("sync_slop").value)
         self.debug_period = int(self.get_parameter("publish_debug_stats_every").value)
@@ -334,6 +352,7 @@ class LidarDepthFusionNode(Node):
                 String, self.closed_loop_feedback_topic, self.closed_loop_feedback_callback, 10
             )
         self.fused_pub = self.create_publisher(PointCloud2, self.output_topic, 10)
+        self.ds_metrics_pub = self.create_publisher(String, self.ds_metrics_topic, 10)
 
         self.depth_sub = message_filters.Subscriber(self, PointCloud2, self.depth_cloud_topic)
         self.lidar_sub = message_filters.Subscriber(self, PointCloud2, self.lidar_cloud_topic)
@@ -352,7 +371,8 @@ class LidarDepthFusionNode(Node):
             f"near_radius_candidates={self.candidate_near_field_radii} "
             f"closed_loop_feedback={self.closed_loop_feedback_enable} "
             f"closed_loop_optimizer={self.closed_loop_optimizer_enable} "
-            f"action_delay_sec={self.closed_loop_action_delay_sec:.2f}"
+            f"action_delay_sec={self.closed_loop_action_delay_sec:.2f} "
+            f"ds_evidence={self.ds_evidence_enable}"
         )
 
     def odom_callback(self, msg: Odometry) -> None:
@@ -472,6 +492,7 @@ class LidarDepthFusionNode(Node):
         template_msg = depth_msg if stamp_to_ns(depth_msg.header.stamp) >= stamp_to_ns(lidar_msg.header.stamp) else lidar_msg
         cloud_msg = self.xyz_to_cloud(fused_points, template_msg)
         self.fused_pub.publish(cloud_msg)
+        self.publish_ds_metrics(stats)
 
         self.frame_count += 1
         if self.frame_count % max(1, self.debug_period) == 0:
@@ -486,7 +507,10 @@ class LidarDepthFusionNode(Node):
                 f"min_hits={self.current_min_hits} "
                 f"dual_bonus={self.current_dual_bonus:.2f} "
                 f"z_max={self.current_z_max:.2f} "
-                f"depth_decay={self.current_depth_decay:.2f}"
+                f"depth_decay={self.current_depth_decay:.2f} "
+                f"ds_occ={stats['ds_belief_occupied_mean']:.3f} "
+                f"ds_unknown={stats['ds_unknown_mean']:.3f} "
+                f"ds_conflict={stats['ds_conflict_mean']:.3f}"
             )
 
     def cloud_to_xyz(self, msg: PointCloud2) -> np.ndarray:
@@ -572,14 +596,21 @@ class LidarDepthFusionNode(Node):
         for idx, key in enumerate(state.key_tuples):
             item = voxels[key]
             item.logit_sum += float(logits[idx])
+            occ_mass, free_mass, unknown_mass = self.ds_mass_from_probability(float(probs[idx]))
             support_hits = 1
             if int(state.counts[idx]) >= self.support_dense_count_threshold:
                 support_hits += 1
             item.hits += support_hits
             if modality == "depth":
                 item.seen_depth = True
+                item.depth_occ_mass = max(item.depth_occ_mass, occ_mass)
+                item.depth_free_mass = max(item.depth_free_mass, free_mass)
+                item.depth_unknown_mass = min(item.depth_unknown_mass, unknown_mass)
             else:
                 item.seen_lidar = True
+                item.lidar_occ_mass = max(item.lidar_occ_mass, occ_mass)
+                item.lidar_free_mass = max(item.lidar_free_mass, free_mass)
+                item.lidar_unknown_mass = min(item.lidar_unknown_mass, unknown_mass)
 
     def compute_fusion_output(
         self,
@@ -598,16 +629,19 @@ class LidarDepthFusionNode(Node):
 
         candidate_voxels = len(voxels)
         voxel_probabilities: Dict[Tuple[int, int, int], float] = {}
+        ds_metrics_by_key: Dict[Tuple[int, int, int], dict] = {}
 
         for key, evidence in voxels.items():
             probability = float(sigmoid(np.array([evidence.logit_sum], dtype=np.float32))[0])
             voxel_probabilities[key] = probability
+            ds_metrics_by_key[key] = self.compute_ds_metrics(evidence)
 
         return {
             "voxels": voxels,
             "candidate_voxels": int(candidate_voxels),
             "voxel_probabilities": voxel_probabilities,
             "voxel_hits": {key: evidence.hits for key, evidence in voxels.items()},
+            "ds_metrics": ds_metrics_by_key,
         }
 
     def build_fusion_state(
@@ -635,10 +669,14 @@ class LidarDepthFusionNode(Node):
     ) -> Tuple[np.ndarray, dict]:
         voxels = fusion_state["voxels"]
         voxel_probabilities = fusion_state["voxel_probabilities"]
+        ds_metrics_by_key = fusion_state.get("ds_metrics", {})
         fused = []
         depth_only = 0
         lidar_only = 0
         dual = 0
+        ds_occ_values = []
+        ds_unknown_values = []
+        ds_conflict_values = []
 
         for key, evidence in voxels.items():
             probability = self.effective_probability(
@@ -646,6 +684,11 @@ class LidarDepthFusionNode(Node):
             )
             if probability < threshold or evidence.hits < min_hits:
                 continue
+            ds_metrics = ds_metrics_by_key.get(key)
+            if ds_metrics is not None:
+                ds_occ_values.append(float(ds_metrics["belief_occupied"]))
+                ds_unknown_values.append(float(ds_metrics["unknown"]))
+                ds_conflict_values.append(float(ds_metrics["conflict"]))
             if evidence.seen_depth and evidence.seen_lidar:
                 dual += 1
             elif evidence.seen_depth:
@@ -670,8 +713,80 @@ class LidarDepthFusionNode(Node):
             "retention_ratio": float(
                 fused_np.shape[0] / max(1, fusion_state["candidate_voxels"])
             ),
+            "ds_belief_occupied_mean": self.safe_mean(ds_occ_values),
+            "ds_unknown_mean": self.safe_mean(ds_unknown_values),
+            "ds_conflict_mean": self.safe_mean(ds_conflict_values),
         }
         return fused_np, stats
+
+    def publish_ds_metrics(self, stats: dict) -> None:
+        if not self.ds_evidence_enable:
+            return
+        payload = {
+            "frame": int(self.frame_count),
+            "belief_occupied_mean": float(stats["ds_belief_occupied_mean"]),
+            "unknown_mean": float(stats["ds_unknown_mean"]),
+            "conflict_mean": float(stats["ds_conflict_mean"]),
+            "fused_voxels": int(stats["fused_voxels"]),
+            "dual_voxels": int(stats["dual_voxels"]),
+        }
+        msg = String()
+        msg.data = json.dumps(payload, separators=(",", ":"))
+        self.ds_metrics_pub.publish(msg)
+
+    def ds_mass_from_probability(self, probability: float) -> tuple[float, float, float]:
+        if not self.ds_evidence_enable:
+            return 0.0, 0.0, 1.0
+        unknown = self.ds_unknown_floor + (1.0 - probability) * 0.35
+        unknown = min(0.95, max(self.ds_unknown_floor, unknown))
+        remaining = max(0.0, 1.0 - unknown)
+        free_mass = min(remaining, self.ds_free_scale * (1.0 - probability))
+        occ_mass = max(0.0, remaining - free_mass)
+        total = occ_mass + free_mass + unknown
+        if total <= 1e-9:
+            return 0.0, 0.0, 1.0
+        return occ_mass / total, free_mass / total, unknown / total
+
+    def compute_ds_metrics(self, evidence: VoxelEvidence) -> dict:
+        if not self.ds_evidence_enable:
+            return {"belief_occupied": 0.0, "belief_free": 0.0, "unknown": 1.0, "conflict": 0.0}
+        depth_mass = (
+            evidence.depth_occ_mass,
+            evidence.depth_free_mass,
+            evidence.depth_unknown_mass,
+        )
+        lidar_mass = (
+            evidence.lidar_occ_mass,
+            evidence.lidar_free_mass,
+            evidence.lidar_unknown_mass,
+        )
+        if not evidence.seen_depth:
+            depth_mass = (0.0, 0.0, 1.0)
+        if not evidence.seen_lidar:
+            lidar_mass = (0.0, 0.0, 1.0)
+        return self.combine_ds_masses(depth_mass, lidar_mass)
+
+    def combine_ds_masses(
+        self, first: tuple[float, float, float], second: tuple[float, float, float]
+    ) -> dict:
+        occ_a, free_a, unknown_a = first
+        occ_b, free_b, unknown_b = second
+        conflict = occ_a * free_b + free_a * occ_b
+        denominator = max(1e-6, 1.0 - conflict)
+        occ = (occ_a * occ_b + occ_a * unknown_b + unknown_a * occ_b) / denominator
+        free = (free_a * free_b + free_a * unknown_b + unknown_a * free_b) / denominator
+        unknown = (unknown_a * unknown_b) / denominator
+        return {
+            "belief_occupied": float(max(0.0, min(1.0, occ))),
+            "belief_free": float(max(0.0, min(1.0, free))),
+            "unknown": float(max(0.0, min(1.0, unknown))),
+            "conflict": float(max(0.0, min(1.0, conflict))),
+        }
+
+    def safe_mean(self, values: list[float]) -> float:
+        if not values:
+            return 0.0
+        return float(sum(values) / len(values))
 
     def auto_tune_parameters(
         self, fusion_state: dict, depth_pts: np.ndarray, lidar_pts: np.ndarray

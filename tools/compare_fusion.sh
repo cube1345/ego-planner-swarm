@@ -58,6 +58,9 @@ CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="0.30"
 CLOSED_LOOP_ACTION_DELAY_SEC="3.0"
 CLOSED_LOOP_ACTION_HISTORY_SEC="20.0"
 CLOSED_LOOP_WINDOW_SEC="8.0"
+DS_EVIDENCE_ENABLE="True"
+DS_UNKNOWN_FLOOR="0.10"
+DS_FREE_SCALE="0.35"
 INIT_X="-15.0"
 INIT_Y="0.0"
 INIT_Z="0.1"
@@ -124,6 +127,9 @@ Usage: bash tools/compare_fusion.sh [options]
   --closed-loop-action-delay-sec FLOAT
   --closed-loop-action-history-sec FLOAT
   --closed-loop-window-sec FLOAT
+  --ds-evidence-enable True|False
+  --ds-unknown-floor FLOAT
+  --ds-free-scale FLOAT
   --init-x FLOAT
   --init-y FLOAT
   --init-z FLOAT
@@ -190,6 +196,9 @@ while [[ $# -gt 0 ]]; do
     --closed-loop-action-delay-sec) CLOSED_LOOP_ACTION_DELAY_SEC="$2"; shift 2 ;;
     --closed-loop-action-history-sec) CLOSED_LOOP_ACTION_HISTORY_SEC="$2"; shift 2 ;;
     --closed-loop-window-sec) CLOSED_LOOP_WINDOW_SEC="$2"; shift 2 ;;
+    --ds-evidence-enable) DS_EVIDENCE_ENABLE="$2"; shift 2 ;;
+    --ds-unknown-floor) DS_UNKNOWN_FLOOR="$2"; shift 2 ;;
+    --ds-free-scale) DS_FREE_SCALE="$2"; shift 2 ;;
     --init-x) INIT_X="$2"; shift 2 ;;
     --init-y) INIT_Y="$2"; shift 2 ;;
     --init-z) INIT_Z="$2"; shift 2 ;;
@@ -341,6 +350,9 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   closed_loop_action_delay_sec:="$CLOSED_LOOP_ACTION_DELAY_SEC" \
   closed_loop_action_history_sec:="$CLOSED_LOOP_ACTION_HISTORY_SEC" \
   closed_loop_window_sec:="$CLOSED_LOOP_WINDOW_SEC" \
+  ds_evidence_enable:="$DS_EVIDENCE_ENABLE" \
+  ds_unknown_floor:="$DS_UNKNOWN_FLOOR" \
+  ds_free_scale:="$DS_FREE_SCALE" \
   >"$LAUNCH_LOG" 2>&1 &
 LAUNCH_PID=$!
 

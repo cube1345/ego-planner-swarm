@@ -1,6 +1,6 @@
 # Ego-Planner 当前操作指南
 
-更新时间：2026-05-13
+更新时间：2026-05-15
 
 ## 1. 适用范围
 
@@ -99,6 +99,7 @@ ros2 launch ego_planner rviz.launch.py
 
 - 当前默认已开启自适应 `min_probability`、`min_hits`、`dual_bonus`
 - 当前默认已开启 closed-loop feedback 节点
+- 当前默认已开启 Dempster-Shafer 证据指标层，用于观测融合不确定性与冲突度
 - sliding-window online optimizer 当前保留为实验开关，默认关闭，因为完整 A/B 测试暂未体现长期正收益
 - closed-loop 默认窗口为 `8.0s`，可通过最近窗口内的路径长度、重规划代理、碰撞风险、加速度 RMS 和地图抖动影响候选参数评分
 - `min_probability` 当前默认搜索区间为 `0.20 ~ 0.35`
@@ -171,7 +172,8 @@ bash tools/compare_fusion.sh \
   --point0-y 0.0 \
   --point0-z 1.0 \
   --min-probability 0.30 \
-  --adaptive-enable True
+  --adaptive-enable True \
+  --ds-evidence-enable True
 ```
 
 关键产物：
@@ -179,6 +181,12 @@ bash tools/compare_fusion.sh \
 - `artifacts/headless_eval/<label>.summary.json`
 - `artifacts/headless_eval/<label>_sim_stats/sim_stats_summary.json`
 - `artifacts/headless_eval/<label>.launch.log`
+
+D-S 证据指标可通过参数控制：
+
+- `--ds-evidence-enable True|False`
+- `--ds-unknown-floor FLOAT`
+- `--ds-free-scale FLOAT`
 
 当前版本已经修复：
 
@@ -235,7 +243,35 @@ bash tools/compare_fusion.sh \
 closed_loop_optimizer_enable:=True
 ```
 
-### 9.5 控制自适应过程的超参数
+### 9.5 Dempster-Shafer 证据指标层
+
+当前融合节点额外实现了 Dempster-Shafer evidence metrics：
+
+```text
+/drone_0_fusion/ds_metrics
+```
+
+该层把 depth 与 lidar 对同一体素的占据、空闲和未知质量组合起来，输出 JSON 字符串，核心字段包括：
+
+- `belief_occupied_mean`
+- `unknown_mean`
+- `conflict_mean`
+- `fused_voxels`
+
+工程定位：
+
+- 它是融合质量诊断和后续自适应优化的指标层
+- 当前默认不替换 `fused_cloud` 的筛选逻辑
+- `unknown_mean` 可用于观察传感器证据不足区域
+- `conflict_mean` 可用于观察两路传感器冲突区域
+
+手动查看：
+
+```bash
+ros2 topic echo /drone_0_fusion/ds_metrics
+```
+
+### 9.6 控制自适应过程的超参数
 
 当前用于控制自适应过程的超参数包括：
 
@@ -258,6 +294,9 @@ closed_loop_optimizer_enable:=True
 - `closed_loop_action_delay_sec`
 - `closed_loop_action_history_sec`
 - `closed_loop_window_sec`
+- `ds_evidence_enable`
+- `ds_unknown_floor`
+- `ds_free_scale`
 - `adaptive_score_alpha`
 - `adaptive_eval_range`
 - `adaptive_min_gt_voxels`

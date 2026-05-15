@@ -74,6 +74,9 @@ def launch_setup(context, *args, **kwargs):
     closed_loop_action_delay_sec = LaunchConfiguration('closed_loop_action_delay_sec').perform(context)
     closed_loop_action_history_sec = LaunchConfiguration('closed_loop_action_history_sec').perform(context)
     closed_loop_window_sec = LaunchConfiguration('closed_loop_window_sec').perform(context)
+    ds_evidence_enable = LaunchConfiguration('ds_evidence_enable').perform(context)
+    ds_unknown_floor = LaunchConfiguration('ds_unknown_floor').perform(context)
+    ds_free_scale = LaunchConfiguration('ds_free_scale').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
@@ -285,6 +288,10 @@ def launch_setup(context, *args, **kwargs):
             '-p', f'closed_loop_candidate_score_alpha:={closed_loop_candidate_score_alpha}',
             '-p', f'closed_loop_action_delay_sec:={closed_loop_action_delay_sec}',
             '-p', f'closed_loop_action_history_sec:={closed_loop_action_history_sec}',
+            '-p', f'ds_metrics_topic:=/drone_{drone_id}_fusion/ds_metrics',
+            '-p', f'ds_evidence_enable:={ds_evidence_enable}',
+            '-p', f'ds_unknown_floor:={ds_unknown_floor}',
+            '-p', f'ds_free_scale:={ds_free_scale}',
         ],
         output='screen',
         condition=IfCondition(use_fusion),
@@ -382,5 +389,8 @@ def generate_launch_description():
         DeclareLaunchArgument('closed_loop_action_delay_sec', default_value='3.0'),
         DeclareLaunchArgument('closed_loop_action_history_sec', default_value='20.0'),
         DeclareLaunchArgument('closed_loop_window_sec', default_value='8.0'),
+        DeclareLaunchArgument('ds_evidence_enable', default_value='True'),
+        DeclareLaunchArgument('ds_unknown_floor', default_value='0.10'),
+        DeclareLaunchArgument('ds_free_scale', default_value='0.35'),
         OpaqueFunction(function=launch_setup),
     ])
