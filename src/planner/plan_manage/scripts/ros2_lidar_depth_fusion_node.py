@@ -140,6 +140,11 @@ class LidarDepthFusionNode(Node):
         self.declare_parameter("ds_evidence_enable", True)
         self.declare_parameter("ds_unknown_floor", 0.10)
         self.declare_parameter("ds_free_scale", 0.35)
+        self.declare_parameter("adaptive_ds_score_enable", True)
+        self.declare_parameter("adaptive_ds_unknown_weight", 0.002)
+        self.declare_parameter("adaptive_ds_conflict_weight", 0.004)
+        self.declare_parameter("adaptive_ds_unknown_ref", 0.50)
+        self.declare_parameter("adaptive_ds_conflict_ref", 0.08)
         self.declare_parameter("sync_queue", 10)
         self.declare_parameter("sync_slop", 0.08)
         self.declare_parameter("publish_debug_stats_every", 20)
@@ -281,6 +286,21 @@ class LidarDepthFusionNode(Node):
         )
         self.ds_free_scale = min(
             0.95, max(0.0, float(self.get_parameter("ds_free_scale").value))
+        )
+        self.adaptive_ds_score_enable = bool(
+            self.get_parameter("adaptive_ds_score_enable").value
+        )
+        self.adaptive_ds_unknown_weight = max(
+            0.0, float(self.get_parameter("adaptive_ds_unknown_weight").value)
+        )
+        self.adaptive_ds_conflict_weight = max(
+            0.0, float(self.get_parameter("adaptive_ds_conflict_weight").value)
+        )
+        self.adaptive_ds_unknown_ref = max(
+            1e-6, float(self.get_parameter("adaptive_ds_unknown_ref").value)
+        )
+        self.adaptive_ds_conflict_ref = max(
+            1e-6, float(self.get_parameter("adaptive_ds_conflict_ref").value)
         )
         sync_queue = int(self.get_parameter("sync_queue").value)
         sync_slop = float(self.get_parameter("sync_slop").value)
@@ -910,6 +930,9 @@ class LidarDepthFusionNode(Node):
                                 dual_key,
                             )
                             utility = self.closed_loop_local_score_weight * local_utility
+                            utility -= self.compute_ds_candidate_penalty(
+                                predicted, candidate_state
+                            )
                             utility += self.closed_loop_candidate_bonus(candidate_key)
                             if self.adaptive_retention_enable:
                                 retention_ratio = len(predicted) / max(1, candidate_state["candidate_voxels"])
@@ -1005,6 +1028,35 @@ class LidarDepthFusionNode(Node):
         if candidate_score is None:
             return 0.0
         return self.closed_loop_feedback_weight * candidate_score
+
+    def compute_ds_candidate_penalty(self, predicted: set, fusion_state: dict) -> float:
+        if (
+            not self.ds_evidence_enable
+            or not self.adaptive_ds_score_enable
+            or not predicted
+        ):
+            return 0.0
+        ds_metrics_by_key = fusion_state.get("ds_metrics", {})
+        unknown_values = []
+        conflict_values = []
+        for key in predicted:
+            metrics = ds_metrics_by_key.get(key)
+            if metrics is None:
+                continue
+            unknown_values.append(float(metrics.get("unknown", 0.0)))
+            conflict_values.append(float(metrics.get("conflict", 0.0)))
+        if not unknown_values and not conflict_values:
+            return 0.0
+        unknown_penalty = min(
+            1.0, self.safe_mean(unknown_values) / self.adaptive_ds_unknown_ref
+        )
+        conflict_penalty = min(
+            1.0, self.safe_mean(conflict_values) / self.adaptive_ds_conflict_ref
+        )
+        return (
+            self.adaptive_ds_unknown_weight * unknown_penalty
+            + self.adaptive_ds_conflict_weight * conflict_penalty
+        )
 
     def build_probability_candidates(self) -> list[float]:
         if not self.adaptive_min_probability_enable:

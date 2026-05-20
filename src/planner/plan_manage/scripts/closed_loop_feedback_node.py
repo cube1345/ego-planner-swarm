@@ -22,9 +22,12 @@ class ClosedLoopFeedbackNode(Node):
         super().__init__("closed_loop_feedback_node")
 
         self.declare_parameter("global_cloud_topic", "/map_generator/global_cloud")
+        self.declare_parameter("dynamic_obstacle_topic", "")
         self.declare_parameter("occupancy_topic", "/drone_0_grid/grid_map/occupancy_inflate")
         self.declare_parameter("odom_topic", "/drone_0_visual_slam/odom")
         self.declare_parameter("feedback_topic", "/drone_0_fusion/closed_loop_feedback")
+        self.declare_parameter("ds_metrics_topic", "/drone_0_fusion/ds_metrics")
+        self.declare_parameter("ds_feedback_enable", True)
         self.declare_parameter("publish_rate", 1.0)
         self.declare_parameter("obstacle_voxel_size", 0.20)
         self.declare_parameter("z_min", -0.10)
@@ -40,13 +43,20 @@ class ClosedLoopFeedbackNode(Node):
         self.declare_parameter("w_collision", 0.35)
         self.declare_parameter("w_smoothness", 0.05)
         self.declare_parameter("w_jitter", 0.04)
+        self.declare_parameter("w_ds_unknown", 0.002)
+        self.declare_parameter("w_ds_conflict", 0.004)
+        self.declare_parameter("ds_unknown_ref", 0.50)
+        self.declare_parameter("ds_conflict_ref", 0.08)
         self.declare_parameter("score_alpha", 0.25)
         self.declare_parameter("window_sec", 8.0)
 
         self.global_cloud_topic = str(self.get_parameter("global_cloud_topic").value)
+        self.dynamic_obstacle_topic = str(self.get_parameter("dynamic_obstacle_topic").value).strip()
         self.occupancy_topic = str(self.get_parameter("occupancy_topic").value)
         self.odom_topic = str(self.get_parameter("odom_topic").value)
         self.feedback_topic = str(self.get_parameter("feedback_topic").value)
+        self.ds_metrics_topic = str(self.get_parameter("ds_metrics_topic").value)
+        self.ds_feedback_enable = bool(self.get_parameter("ds_feedback_enable").value)
         self.obstacle_voxel_size = float(self.get_parameter("obstacle_voxel_size").value)
         self.z_min = float(self.get_parameter("z_min").value)
         self.z_max = float(self.get_parameter("z_max").value)
@@ -61,11 +71,16 @@ class ClosedLoopFeedbackNode(Node):
         self.w_collision = float(self.get_parameter("w_collision").value)
         self.w_smoothness = float(self.get_parameter("w_smoothness").value)
         self.w_jitter = float(self.get_parameter("w_jitter").value)
+        self.w_ds_unknown = float(self.get_parameter("w_ds_unknown").value)
+        self.w_ds_conflict = float(self.get_parameter("w_ds_conflict").value)
+        self.ds_unknown_ref = float(self.get_parameter("ds_unknown_ref").value)
+        self.ds_conflict_ref = float(self.get_parameter("ds_conflict_ref").value)
         self.score_alpha = float(self.get_parameter("score_alpha").value)
         self.window_sec = max(1.0, float(self.get_parameter("window_sec").value))
 
         self.start_wall = time.time()
         self.obstacle_centers = np.empty((0, 3), dtype=np.float64)
+        self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
         self.occ_point_counts: List[int] = []
         self.occ_latest_points = 0
         self.prev_occ_points: Optional[int] = None
@@ -86,8 +101,18 @@ class ClosedLoopFeedbackNode(Node):
         self.distance_samples_window: Deque[tuple[float, float]] = deque()
         self.occ_counts_window: Deque[tuple[float, int]] = deque()
         self.occ_event_times_window: Deque[float] = deque()
+        self.ds_unknown_window: Deque[tuple[float, float]] = deque()
+        self.ds_conflict_window: Deque[tuple[float, float]] = deque()
+        self.ds_belief_occupied_window: Deque[tuple[float, float]] = deque()
+        self.ds_latest_unknown = 0.0
+        self.ds_latest_conflict = 0.0
+        self.ds_latest_belief_occupied = 0.0
 
         self.create_subscription(PointCloud2, self.global_cloud_topic, self.global_cloud_callback, 10)
+        if self.dynamic_obstacle_topic:
+            self.create_subscription(PointCloud2, self.dynamic_obstacle_topic, self.dynamic_obstacle_callback, 10)
+        if self.ds_feedback_enable:
+            self.create_subscription(String, self.ds_metrics_topic, self.ds_metrics_callback, 10)
         self.create_subscription(PointCloud2, self.occupancy_topic, self.occupancy_callback, 10)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 100)
         self.feedback_pub = self.create_publisher(String, self.feedback_topic, 10)
@@ -97,7 +122,9 @@ class ClosedLoopFeedbackNode(Node):
         self.get_logger().info(
             f"closed-loop feedback ready. odom={self.odom_topic} "
             f"occupancy={self.occupancy_topic} global={self.global_cloud_topic} "
-            f"out={self.feedback_topic} window_sec={self.window_sec:.1f}"
+            f"dynamic={self.dynamic_obstacle_topic or '<none>'} out={self.feedback_topic} "
+            f"ds_metrics={self.ds_metrics_topic if self.ds_feedback_enable else '<disabled>'} "
+            f"window_sec={self.window_sec:.1f}"
         )
 
     def global_cloud_callback(self, msg: PointCloud2) -> None:
@@ -119,6 +146,23 @@ class ClosedLoopFeedbackNode(Node):
         keys = np.unique(np.floor(cloud / self.obstacle_voxel_size).astype(np.int32), axis=0)
         self.obstacle_centers = (keys.astype(np.float64) + 0.5) * self.obstacle_voxel_size
 
+    def dynamic_obstacle_callback(self, msg: PointCloud2) -> None:
+        points = [
+            (float(p[0]), float(p[1]), float(p[2]))
+            for p in point_cloud2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True)
+        ]
+        if not points:
+            self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
+            return
+        cloud = np.asarray(points, dtype=np.float64)
+        mask = np.isfinite(cloud).all(axis=1)
+        cloud = cloud[mask]
+        if cloud.size == 0:
+            self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
+            return
+        keys = np.unique(np.floor(cloud / self.obstacle_voxel_size).astype(np.int32), axis=0)
+        self.dynamic_obstacle_centers = (keys.astype(np.float64) + 0.5) * self.obstacle_voxel_size
+
     def occupancy_callback(self, msg: PointCloud2) -> None:
         now = time.time()
         count = 0
@@ -133,6 +177,28 @@ class ClosedLoopFeedbackNode(Node):
                 self.occupancy_change_events += 1
                 self.occ_event_times_window.append(now)
         self.prev_occ_points = count
+        self.prune_window(now)
+
+    def ds_metrics_callback(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except json.JSONDecodeError:
+            return
+        try:
+            unknown = float(payload.get("unknown_mean", 0.0))
+            conflict = float(payload.get("conflict_mean", 0.0))
+            belief_occupied = float(payload.get("belief_occupied_mean", 0.0))
+        except (TypeError, ValueError):
+            return
+        if not (math.isfinite(unknown) and math.isfinite(conflict) and math.isfinite(belief_occupied)):
+            return
+        now = time.time()
+        self.ds_latest_unknown = self.clamp(unknown)
+        self.ds_latest_conflict = self.clamp(conflict)
+        self.ds_latest_belief_occupied = self.clamp(belief_occupied)
+        self.ds_unknown_window.append((now, self.ds_latest_unknown))
+        self.ds_conflict_window.append((now, self.ds_latest_conflict))
+        self.ds_belief_occupied_window.append((now, self.ds_latest_belief_occupied))
         self.prune_window(now)
 
     def odom_callback(self, msg: Odometry) -> None:
@@ -160,11 +226,18 @@ class ClosedLoopFeedbackNode(Node):
         self.prune_window(now)
 
     def update_obstacle_distance(self, pos: np.ndarray, now: float) -> None:
-        if self.obstacle_centers.size == 0:
-            return
         if self.odom_count % self.distance_sample_stride != 0:
             return
-        distances = np.linalg.norm(self.obstacle_centers - pos[None, :], axis=1)
+        centers = self.obstacle_centers
+        if self.dynamic_obstacle_centers.size > 0:
+            centers = (
+                self.dynamic_obstacle_centers
+                if centers.size == 0
+                else np.vstack((centers, self.dynamic_obstacle_centers))
+            )
+        if centers.size == 0:
+            return
+        distances = np.linalg.norm(centers - pos[None, :], axis=1)
         if distances.size == 0:
             return
         nearest = float(np.min(distances))
@@ -183,6 +256,9 @@ class ClosedLoopFeedbackNode(Node):
         window_accel_values = [value for _, value in self.accel_samples_window]
         window_distance_values = [value for _, value in self.distance_samples_window]
         window_occ_counts = [value for _, value in self.occ_counts_window]
+        window_ds_unknown_values = [value for _, value in self.ds_unknown_window]
+        window_ds_conflict_values = [value for _, value in self.ds_conflict_window]
+        window_ds_belief_values = [value for _, value in self.ds_belief_occupied_window]
         window_min_distance = min(window_distance_values) if window_distance_values else float("inf")
         window_violation_ratio = (
             sum(1 for value in window_distance_values if value < self.safety_radius)
@@ -195,12 +271,19 @@ class ClosedLoopFeedbackNode(Node):
         collision_risk = self.compute_collision_risk(window_min_distance)
         smoothness_penalty = self.clamp(self.compute_rms(window_accel_values) / max(1e-6, self.accel_ref))
         map_jitter = self.clamp(self.compute_jitter_ratio(window_occ_counts) / max(1e-6, self.jitter_ref))
+        ds_unknown_mean = self.safe_mean(window_ds_unknown_values)
+        ds_conflict_mean = self.safe_mean(window_ds_conflict_values)
+        ds_belief_occupied_mean = self.safe_mean(window_ds_belief_values)
+        ds_unknown_penalty = self.clamp(ds_unknown_mean / max(1e-6, self.ds_unknown_ref))
+        ds_conflict_penalty = self.clamp(ds_conflict_mean / max(1e-6, self.ds_conflict_ref))
         score = -(
             self.w_path * path_penalty
             + self.w_replan * replan_penalty
             + self.w_collision * collision_risk
             + self.w_smoothness * smoothness_penalty
             + self.w_jitter * map_jitter
+            + self.w_ds_unknown * ds_unknown_penalty
+            + self.w_ds_conflict * ds_conflict_penalty
         )
         if self.closed_loop_score_ema is None:
             self.closed_loop_score_ema = score
@@ -223,6 +306,11 @@ class ClosedLoopFeedbackNode(Node):
             "window_safety_violation_ratio": float(window_violation_ratio),
             "window_accel_rms_mps2": float(self.compute_rms(window_accel_values)),
             "window_occupancy_jitter_ratio": float(self.compute_jitter_ratio(window_occ_counts)),
+            "window_ds_unknown_mean": float(ds_unknown_mean),
+            "window_ds_conflict_mean": float(ds_conflict_mean),
+            "window_ds_belief_occupied_mean": float(ds_belief_occupied_mean),
+            "window_ds_unknown_penalty": float(ds_unknown_penalty),
+            "window_ds_conflict_penalty": float(ds_conflict_penalty),
             "path_length_m": float(self.path_length),
             "replan_proxy_count": int(self.occupancy_change_events),
             "collision_risk_score": float(collision_risk),
@@ -234,6 +322,9 @@ class ClosedLoopFeedbackNode(Node):
             else float(self.safety_violation_count / max(1, self.distance_sample_count)),
             "accel_rms_mps2": float(self.compute_rms(self.accel_samples)),
             "occupancy_jitter_ratio": float(self.compute_jitter_ratio(self.occ_point_counts)),
+            "ds_unknown_mean": float(self.ds_latest_unknown),
+            "ds_conflict_mean": float(self.ds_latest_conflict),
+            "ds_belief_occupied_mean": float(self.ds_latest_belief_occupied),
             "elapsed_sec": float(elapsed),
         }
         msg = String()
@@ -254,6 +345,9 @@ class ClosedLoopFeedbackNode(Node):
             self.accel_samples_window,
             self.distance_samples_window,
             self.occ_counts_window,
+            self.ds_unknown_window,
+            self.ds_conflict_window,
+            self.ds_belief_occupied_window,
         ):
             while values and values[0][0] < cutoff:
                 values.popleft()
@@ -274,6 +368,11 @@ class ClosedLoopFeedbackNode(Node):
             return 0.0
         arr = np.asarray(values, dtype=np.float64)
         return float(math.sqrt(float(np.mean(arr * arr))))
+
+    def safe_mean(self, values: List[float]) -> float:
+        if not values:
+            return 0.0
+        return float(sum(values) / len(values))
 
     def clamp(self, value: float) -> float:
         return max(0.0, min(1.0, value))

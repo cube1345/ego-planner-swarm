@@ -17,6 +17,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
+from std_msgs.msg import String
 
 
 def wrap_angle_rad(angle: float) -> float:
@@ -75,7 +76,12 @@ class SimFlightStatsReport(Node):
         self.occ_latest_points = 0
         self.occ_peak_points = 0
         self.occ_point_counts: List[int] = []
+        self.ds_unknown_values: List[float] = []
+        self.ds_conflict_values: List[float] = []
+        self.ds_belief_occupied_values: List[float] = []
         self.obstacle_centers = np.empty((0, 3), dtype=np.float64)
+        self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
+        self.dynamic_obstacle_point_count = 0
 
         if args.launch_log_path:
             # The redirected batch launch log starts recording before this node starts.
@@ -107,26 +113,40 @@ class SimFlightStatsReport(Node):
         self.goal_exit_margin = float(args.goal_exit_margin)
         self.left_goal_region = False
         self.min_obstacle_distance = float("inf")
+        self.min_dynamic_obstacle_distance = float("inf")
         self.safety_violation_count = 0
+        self.dynamic_safety_violation_count = 0
         self.distance_sample_count = 0
+        self.dynamic_distance_sample_count = 0
         self.distance_sample_stride = max(1, int(args.distance_sample_stride))
         self.safety_radius = float(args.safety_radius)
 
         self.global_sub = self.create_subscription(
             PointCloud2, args.global_cloud_topic, self.global_cloud_callback, 10
         )
+        self.dynamic_sub = None
+        if str(args.dynamic_obstacle_topic).strip():
+            self.dynamic_sub = self.create_subscription(
+                PointCloud2, args.dynamic_obstacle_topic, self.dynamic_obstacle_callback, 10
+            )
         self.occ_sub = self.create_subscription(
             PointCloud2, args.occupancy_topic, self.occupancy_callback, 10
         )
         self.odom_sub = self.create_subscription(
             Odometry, args.odom_topic, self.odom_callback, 100
         )
+        self.ds_sub = None
+        if str(args.ds_metrics_topic).strip():
+            self.ds_sub = self.create_subscription(
+                String, args.ds_metrics_topic, self.ds_metrics_callback, 10
+            )
         self.timer = self.create_timer(0.2, self.on_timer)
 
         self.get_logger().info(
             f"stats monitor started. duration={self.duration_sec:.1f}s "
             f"global={args.global_cloud_topic} occupancy={args.occupancy_topic} odom={args.odom_topic} "
-            f"replan_log_root={args.replan_log_root}"
+            f"dynamic={args.dynamic_obstacle_topic or '<none>'} "
+            f"ds_metrics={args.ds_metrics_topic or '<none>'} replan_log_root={args.replan_log_root}"
         )
 
     def global_cloud_callback(self, msg: PointCloud2) -> None:
@@ -163,6 +183,26 @@ class SimFlightStatsReport(Node):
             f"voxels={self.obstacle_voxel_count} clusters={self.obstacle_cluster_count}"
         )
 
+    def dynamic_obstacle_callback(self, msg: PointCloud2) -> None:
+        points = [
+            (float(p[0]), float(p[1]), float(p[2]))
+            for p in point_cloud2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True)
+        ]
+        self.dynamic_obstacle_point_count = len(points)
+        if not points:
+            self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
+            return
+        cloud = np.asarray(points, dtype=np.float64)
+        mask = np.isfinite(cloud).all(axis=1)
+        cloud = cloud[mask]
+        if cloud.size == 0:
+            self.dynamic_obstacle_centers = np.empty((0, 3), dtype=np.float64)
+            return
+        keys_np = np.unique(np.floor(cloud / self.args.obstacle_voxel_size).astype(np.int32), axis=0)
+        self.dynamic_obstacle_centers = (
+            keys_np.astype(np.float64) + 0.5
+        ) * self.args.obstacle_voxel_size
+
     def occupancy_callback(self, msg: PointCloud2) -> None:
         count = 0
         for _ in point_cloud2.read_points(msg, field_names=("x", "y", "z"), skip_nans=True):
@@ -171,6 +211,20 @@ class SimFlightStatsReport(Node):
         if count > self.occ_peak_points:
             self.occ_peak_points = count
         self.occ_point_counts.append(count)
+
+    def ds_metrics_callback(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+            unknown = float(payload.get("unknown_mean", 0.0))
+            conflict = float(payload.get("conflict_mean", 0.0))
+            belief_occupied = float(payload.get("belief_occupied_mean", 0.0))
+        except Exception:
+            return
+        if not (math.isfinite(unknown) and math.isfinite(conflict) and math.isfinite(belief_occupied)):
+            return
+        self.ds_unknown_values.append(max(0.0, min(1.0, unknown)))
+        self.ds_conflict_values.append(max(0.0, min(1.0, conflict)))
+        self.ds_belief_occupied_values.append(max(0.0, min(1.0, belief_occupied)))
 
     def scan_replan_total(self) -> int:
         if self.args.launch_log_path:
@@ -260,6 +314,7 @@ class SimFlightStatsReport(Node):
                 self.goal_reached_time = now - self.start_wall
 
         self.update_obstacle_distance(pos)
+        self.update_dynamic_obstacle_distance(pos)
 
     def update_obstacle_distance(self, pos: np.ndarray) -> None:
         if self.obstacle_centers.size == 0:
@@ -275,6 +330,21 @@ class SimFlightStatsReport(Node):
             self.min_obstacle_distance = nearest
         if nearest < self.safety_radius:
             self.safety_violation_count += 1
+
+    def update_dynamic_obstacle_distance(self, pos: np.ndarray) -> None:
+        if self.dynamic_obstacle_centers.size == 0:
+            return
+        if self.odom_count % self.distance_sample_stride != 0:
+            return
+        distances = np.linalg.norm(self.dynamic_obstacle_centers - pos[None, :], axis=1)
+        if distances.size == 0:
+            return
+        nearest = float(np.min(distances))
+        self.dynamic_distance_sample_count += 1
+        if nearest < self.min_dynamic_obstacle_distance:
+            self.min_dynamic_obstacle_distance = nearest
+        if nearest < self.safety_radius:
+            self.dynamic_safety_violation_count += 1
 
     def on_timer(self) -> None:
         elapsed = time.time() - self.start_wall
@@ -299,14 +369,33 @@ class SimFlightStatsReport(Node):
         adaptive_stats = self.scan_adaptive_parameter_stats()
         occ_jitter_ratio = self.compute_jitter_ratio(self.occ_point_counts)
         accel_rms = self.compute_rms(self.accel_samples)
+        ds_unknown_mean = self.compute_mean(self.ds_unknown_values)
+        ds_conflict_mean = self.compute_mean(self.ds_conflict_values)
+        ds_belief_occupied_mean = self.compute_mean(self.ds_belief_occupied_values)
         min_distance = (
             None if not math.isfinite(self.min_obstacle_distance) else self.min_obstacle_distance
         )
+        min_dynamic_distance = (
+            None
+            if not math.isfinite(self.min_dynamic_obstacle_distance)
+            else self.min_dynamic_obstacle_distance
+        )
         collision_risk_score = self.compute_collision_risk_score(min_distance)
+        dynamic_collision_risk_score = (
+            0.0
+            if self.dynamic_distance_sample_count <= 0
+            else self.compute_collision_risk_score(min_dynamic_distance)
+        )
+        combined_collision_risk_score = max(collision_risk_score, dynamic_collision_risk_score)
         safety_violation_ratio = (
             0.0
             if self.distance_sample_count <= 0
             else self.safety_violation_count / max(1, self.distance_sample_count)
+        )
+        dynamic_safety_violation_ratio = (
+            0.0
+            if self.dynamic_distance_sample_count <= 0
+            else self.dynamic_safety_violation_count / max(1, self.dynamic_distance_sample_count)
         )
 
         result = {
@@ -314,6 +403,7 @@ class SimFlightStatsReport(Node):
             "obstacle_points": int(self.obstacle_point_count),
             "obstacle_voxels": int(self.obstacle_voxel_count),
             "obstacle_clusters_est": int(self.obstacle_cluster_count),
+            "dynamic_obstacle_points_latest": int(self.dynamic_obstacle_point_count),
             "occupancy_points_latest": int(self.occ_latest_points),
             "occupancy_points_peak": int(self.occ_peak_points),
             "replan_count": int(replan_count),
@@ -325,12 +415,22 @@ class SimFlightStatsReport(Node):
             "max_speed_mps": float(self.max_speed),
             "accel_rms_mps2": float(accel_rms),
             "min_obstacle_distance_m": min_distance,
+            "min_dynamic_obstacle_distance_m": min_dynamic_distance,
             "safety_radius_m": float(self.safety_radius),
             "safety_violation_count": int(self.safety_violation_count),
+            "dynamic_safety_violation_count": int(self.dynamic_safety_violation_count),
             "safety_distance_samples": int(self.distance_sample_count),
+            "dynamic_safety_distance_samples": int(self.dynamic_distance_sample_count),
             "safety_violation_ratio": float(safety_violation_ratio),
-            "collision_risk_score": float(collision_risk_score),
+            "dynamic_safety_violation_ratio": float(dynamic_safety_violation_ratio),
+            "static_collision_risk_score": float(collision_risk_score),
+            "dynamic_collision_risk_score": float(dynamic_collision_risk_score),
+            "collision_risk_score": float(combined_collision_risk_score),
             "occupancy_jitter_ratio": float(occ_jitter_ratio),
+            "ds_samples": int(len(self.ds_unknown_values)),
+            "ds_unknown_mean": float(ds_unknown_mean),
+            "ds_conflict_mean": float(ds_conflict_mean),
+            "ds_belief_occupied_mean": float(ds_belief_occupied_mean),
             "adaptive_param_switch_count": int(adaptive_stats["switch_count"]),
             "adaptive_param_samples": int(adaptive_stats["samples"]),
             "adaptive_param_switch_rate": float(adaptive_stats["switch_rate"]),
@@ -443,6 +543,11 @@ class SimFlightStatsReport(Node):
         arr = np.asarray(values, dtype=np.float64)
         return float(math.sqrt(float(np.mean(arr * arr))))
 
+    def compute_mean(self, values: List[float]) -> float:
+        if not values:
+            return 0.0
+        return float(sum(values) / len(values))
+
     def compute_collision_risk_score(self, min_distance: Optional[float]) -> float:
         if min_distance is None:
             return 1.0
@@ -486,6 +591,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--global-cloud-topic", type=str, default="/map_generator/global_cloud")
     parser.add_argument("--occupancy-topic", type=str, default="/drone_0_grid/grid_map/occupancy_inflate")
     parser.add_argument("--odom-topic", type=str, default="/drone_0_visual_slam/odom")
+    parser.add_argument("--ds-metrics-topic", type=str, default="/drone_0_fusion/ds_metrics")
+    parser.add_argument("--dynamic-obstacle-topic", type=str, default="")
     parser.add_argument("--launch-log-path", type=str, default="")
     parser.add_argument("--replan-log-root", type=str, default=os.environ.get("ROS_LOG_DIR", "/tmp/ros_logs"))
     parser.add_argument("--replan-log-file-limit", type=int, default=80)

@@ -37,12 +37,16 @@ def compute_closed_loop_score(
     accel_rms = finite_float(sim.get("accel_rms_mps2"))
     occupancy_jitter = finite_float(sim.get("occupancy_jitter_ratio"))
     switch_rate = finite_float(sim.get("adaptive_param_switch_rate"))
+    ds_unknown = finite_float(sim.get("ds_unknown_mean"))
+    ds_conflict = finite_float(sim.get("ds_conflict_mean"))
 
     path_penalty = clamp(path_length / max(1e-6, args.path_ref_m))
     replan_penalty = clamp(replan_count / max(1e-6, args.replan_ref))
     smoothness_penalty = clamp(accel_rms / max(1e-6, args.accel_ref))
     map_jitter_penalty = clamp(occupancy_jitter / max(1e-6, args.jitter_ref))
     switch_penalty = clamp(switch_rate)
+    ds_unknown_penalty = clamp(ds_unknown / max(1e-6, args.ds_unknown_ref))
+    ds_conflict_penalty = clamp(ds_conflict / max(1e-6, args.ds_conflict_ref))
 
     closed_loop_score = (
         args.w_f1 * fusion_f1
@@ -53,6 +57,8 @@ def compute_closed_loop_score(
         - args.w_smoothness * smoothness_penalty
         - args.w_jitter * map_jitter_penalty
         - args.w_switch * switch_penalty
+        - args.w_ds_unknown * ds_unknown_penalty
+        - args.w_ds_conflict * ds_conflict_penalty
     )
 
     return {
@@ -61,7 +67,8 @@ def compute_closed_loop_score(
             "J = w_f1*F1 + w_recall*Recall - w_path*PathLengthNorm "
             "- w_replan*ReplanNorm - w_collision*CollisionRisk "
             "- w_smoothness*SmoothnessNorm - w_jitter*MapJitterNorm "
-            "- w_switch*ParamSwitchRate"
+            "- w_switch*ParamSwitchRate - w_ds_unknown*DSUnknownNorm "
+            "- w_ds_conflict*DSConflictNorm"
         ),
         "weights": {
             "w_f1": args.w_f1,
@@ -72,6 +79,8 @@ def compute_closed_loop_score(
             "w_smoothness": args.w_smoothness,
             "w_jitter": args.w_jitter,
             "w_switch": args.w_switch,
+            "w_ds_unknown": args.w_ds_unknown,
+            "w_ds_conflict": args.w_ds_conflict,
         },
         "raw_metrics": {
             "fusion_f1": fusion_f1,
@@ -82,6 +91,8 @@ def compute_closed_loop_score(
             "accel_rms_mps2": accel_rms,
             "occupancy_jitter_ratio": occupancy_jitter,
             "adaptive_param_switch_rate": switch_rate,
+            "ds_unknown_mean": ds_unknown,
+            "ds_conflict_mean": ds_conflict,
         },
         "normalized_penalties": {
             "path_length": path_penalty,
@@ -90,12 +101,16 @@ def compute_closed_loop_score(
             "smoothness": smoothness_penalty,
             "map_jitter": map_jitter_penalty,
             "param_switch": switch_penalty,
+            "ds_unknown": ds_unknown_penalty,
+            "ds_conflict": ds_conflict_penalty,
         },
         "references": {
             "path_ref_m": args.path_ref_m,
             "replan_ref": args.replan_ref,
             "accel_ref": args.accel_ref,
             "jitter_ref": args.jitter_ref,
+            "ds_unknown_ref": args.ds_unknown_ref,
+            "ds_conflict_ref": args.ds_conflict_ref,
         },
     }
 
@@ -114,10 +129,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--w-smoothness", type=float, default=0.05)
     parser.add_argument("--w-jitter", type=float, default=0.04)
     parser.add_argument("--w-switch", type=float, default=0.03)
+    parser.add_argument("--w-ds-unknown", type=float, default=0.02)
+    parser.add_argument("--w-ds-conflict", type=float, default=0.04)
     parser.add_argument("--path-ref-m", type=float, default=30.0)
     parser.add_argument("--replan-ref", type=float, default=50.0)
     parser.add_argument("--accel-ref", type=float, default=10.0)
     parser.add_argument("--jitter-ref", type=float, default=0.20)
+    parser.add_argument("--ds-unknown-ref", type=float, default=0.50)
+    parser.add_argument("--ds-conflict-ref", type=float, default=0.08)
     return parser.parse_args()
 
 

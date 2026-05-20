@@ -7,6 +7,13 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
+DEFAULT_DYNAMIC_OBSTACLE_SPECS = (
+    '0.0,1.8,0.75,0.30,1.30,0.0,1.2,9.0,0.0;'
+    '5.0,-1.6,0.75,0.28,1.20,0.0,1.0,8.0,1.57;'
+    '-5.5,2.2,0.75,0.26,1.10,0.8,0.7,10.0,3.14;'
+    '9.0,-2.4,0.75,0.24,1.10,-0.7,0.9,11.0,0.78'
+)
+
 
 def launch_setup(context, *args, **kwargs):
     obj_num = LaunchConfiguration('obj_num').perform(context)
@@ -74,9 +81,25 @@ def launch_setup(context, *args, **kwargs):
     closed_loop_action_delay_sec = LaunchConfiguration('closed_loop_action_delay_sec').perform(context)
     closed_loop_action_history_sec = LaunchConfiguration('closed_loop_action_history_sec').perform(context)
     closed_loop_window_sec = LaunchConfiguration('closed_loop_window_sec').perform(context)
+    closed_loop_ds_feedback_enable = LaunchConfiguration('closed_loop_ds_feedback_enable').perform(context)
+    closed_loop_ds_unknown_weight = LaunchConfiguration('closed_loop_ds_unknown_weight').perform(context)
+    closed_loop_ds_conflict_weight = LaunchConfiguration('closed_loop_ds_conflict_weight').perform(context)
+    closed_loop_ds_unknown_ref = LaunchConfiguration('closed_loop_ds_unknown_ref').perform(context)
+    closed_loop_ds_conflict_ref = LaunchConfiguration('closed_loop_ds_conflict_ref').perform(context)
     ds_evidence_enable = LaunchConfiguration('ds_evidence_enable').perform(context)
     ds_unknown_floor = LaunchConfiguration('ds_unknown_floor').perform(context)
     ds_free_scale = LaunchConfiguration('ds_free_scale').perform(context)
+    adaptive_ds_score_enable = LaunchConfiguration('adaptive_ds_score_enable').perform(context)
+    adaptive_ds_unknown_weight = LaunchConfiguration('adaptive_ds_unknown_weight').perform(context)
+    adaptive_ds_conflict_weight = LaunchConfiguration('adaptive_ds_conflict_weight').perform(context)
+    adaptive_ds_unknown_ref = LaunchConfiguration('adaptive_ds_unknown_ref').perform(context)
+    adaptive_ds_conflict_ref = LaunchConfiguration('adaptive_ds_conflict_ref').perform(context)
+    dynamic_obstacles_enable = LaunchConfiguration('dynamic_obstacles_enable')
+    dynamic_obstacles_topic = f'/drone_{drone_id}_dynamic_obstacles/cloud'
+    dynamic_obstacles_marker_topic = f'/drone_{drone_id}_dynamic_obstacles/markers'
+    dynamic_obstacles_specs = LaunchConfiguration('dynamic_obstacles_specs').perform(context)
+    dynamic_obstacles_rate = LaunchConfiguration('dynamic_obstacles_rate').perform(context)
+    dynamic_obstacles_spacing = LaunchConfiguration('dynamic_obstacles_spacing').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
@@ -203,7 +226,25 @@ def launch_setup(context, *args, **kwargs):
             'init_y_': init_y,
             'init_z_': init_z,
             'odometry_topic': odom_topic,
+            'dynamic_cloud_topic': dynamic_obstacles_topic,
         }.items(),
+    )
+
+    dynamic_obstacle_node = Node(
+        package='ego_planner',
+        executable='dynamic_obstacle_cloud.py',
+        name=f'drone_{drone_id}_dynamic_obstacle_cloud',
+        output='screen',
+        parameters=[
+            {'cloud_topic': dynamic_obstacles_topic},
+            {'marker_topic': dynamic_obstacles_marker_topic},
+            {'frame_id': 'world'},
+            {'publish_rate': float(dynamic_obstacles_rate)},
+            {'point_spacing': float(dynamic_obstacles_spacing)},
+            {'force_zero_stamp': True},
+            {'obstacle_specs': dynamic_obstacles_specs},
+        ],
+        condition=IfCondition(dynamic_obstacles_enable),
     )
 
     simulated_lidar_node = Node(
@@ -213,6 +254,8 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         parameters=[
             {'global_cloud_topic': '/map_generator/global_cloud'},
+            {'dynamic_cloud_topic': dynamic_obstacles_topic},
+            {'dynamic_cloud_timeout_sec': 0.5},
             {'odom_topic': odom_topic_full},
             {'lidar_points_topic': lidar_topic_full},
             {'frame_id': 'world'},
@@ -292,6 +335,11 @@ def launch_setup(context, *args, **kwargs):
             '-p', f'ds_evidence_enable:={ds_evidence_enable}',
             '-p', f'ds_unknown_floor:={ds_unknown_floor}',
             '-p', f'ds_free_scale:={ds_free_scale}',
+            '-p', f'adaptive_ds_score_enable:={adaptive_ds_score_enable}',
+            '-p', f'adaptive_ds_unknown_weight:={adaptive_ds_unknown_weight}',
+            '-p', f'adaptive_ds_conflict_weight:={adaptive_ds_conflict_weight}',
+            '-p', f'adaptive_ds_unknown_ref:={adaptive_ds_unknown_ref}',
+            '-p', f'adaptive_ds_conflict_ref:={adaptive_ds_conflict_ref}',
         ],
         output='screen',
         condition=IfCondition(use_fusion),
@@ -302,9 +350,16 @@ def launch_setup(context, *args, **kwargs):
             fusion_python_executable, feedback_script,
             '--ros-args',
             '-p', 'global_cloud_topic:=/map_generator/global_cloud',
+            '-p', f'dynamic_obstacle_topic:={dynamic_obstacles_topic}',
             '-p', f'occupancy_topic:=/drone_{drone_id}_grid/grid_map/occupancy_inflate',
             '-p', f'odom_topic:={odom_topic_full}',
             '-p', f'feedback_topic:={feedback_topic_full}',
+            '-p', f'ds_metrics_topic:=/drone_{drone_id}_fusion/ds_metrics',
+            '-p', f'ds_feedback_enable:={closed_loop_ds_feedback_enable}',
+            '-p', f'w_ds_unknown:={closed_loop_ds_unknown_weight}',
+            '-p', f'w_ds_conflict:={closed_loop_ds_conflict_weight}',
+            '-p', f'ds_unknown_ref:={closed_loop_ds_unknown_ref}',
+            '-p', f'ds_conflict_ref:={closed_loop_ds_conflict_ref}',
             '-p', f'window_sec:={closed_loop_window_sec}',
         ],
         output='screen',
@@ -316,6 +371,7 @@ def launch_setup(context, *args, **kwargs):
         mockamap_node,
         advanced_param_include,
         traj_server_node,
+        dynamic_obstacle_node,
         simulated_lidar_node,
         closed_loop_feedback_process,
         fusion_process,
@@ -389,8 +445,25 @@ def generate_launch_description():
         DeclareLaunchArgument('closed_loop_action_delay_sec', default_value='3.0'),
         DeclareLaunchArgument('closed_loop_action_history_sec', default_value='20.0'),
         DeclareLaunchArgument('closed_loop_window_sec', default_value='8.0'),
+        DeclareLaunchArgument('closed_loop_ds_feedback_enable', default_value='True'),
+        DeclareLaunchArgument('closed_loop_ds_unknown_weight', default_value='0.002'),
+        DeclareLaunchArgument('closed_loop_ds_conflict_weight', default_value='0.004'),
+        DeclareLaunchArgument('closed_loop_ds_unknown_ref', default_value='0.50'),
+        DeclareLaunchArgument('closed_loop_ds_conflict_ref', default_value='0.08'),
         DeclareLaunchArgument('ds_evidence_enable', default_value='True'),
         DeclareLaunchArgument('ds_unknown_floor', default_value='0.10'),
         DeclareLaunchArgument('ds_free_scale', default_value='0.35'),
+        DeclareLaunchArgument('adaptive_ds_score_enable', default_value='True'),
+        DeclareLaunchArgument('adaptive_ds_unknown_weight', default_value='0.002'),
+        DeclareLaunchArgument('adaptive_ds_conflict_weight', default_value='0.004'),
+        DeclareLaunchArgument('adaptive_ds_unknown_ref', default_value='0.50'),
+        DeclareLaunchArgument('adaptive_ds_conflict_ref', default_value='0.08'),
+        DeclareLaunchArgument('dynamic_obstacles_enable', default_value='False'),
+        DeclareLaunchArgument(
+            'dynamic_obstacles_specs',
+            default_value=DEFAULT_DYNAMIC_OBSTACLE_SPECS,
+        ),
+        DeclareLaunchArgument('dynamic_obstacles_rate', default_value='15.0'),
+        DeclareLaunchArgument('dynamic_obstacles_spacing', default_value='0.12'),
         OpaqueFunction(function=launch_setup),
     ])

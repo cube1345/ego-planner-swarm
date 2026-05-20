@@ -58,9 +58,23 @@ CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="0.30"
 CLOSED_LOOP_ACTION_DELAY_SEC="3.0"
 CLOSED_LOOP_ACTION_HISTORY_SEC="20.0"
 CLOSED_LOOP_WINDOW_SEC="8.0"
+CLOSED_LOOP_DS_FEEDBACK_ENABLE="True"
+CLOSED_LOOP_DS_UNKNOWN_WEIGHT="0.002"
+CLOSED_LOOP_DS_CONFLICT_WEIGHT="0.004"
+CLOSED_LOOP_DS_UNKNOWN_REF="0.50"
+CLOSED_LOOP_DS_CONFLICT_REF="0.08"
 DS_EVIDENCE_ENABLE="True"
 DS_UNKNOWN_FLOOR="0.10"
 DS_FREE_SCALE="0.35"
+ADAPTIVE_DS_SCORE_ENABLE="True"
+ADAPTIVE_DS_UNKNOWN_WEIGHT="0.002"
+ADAPTIVE_DS_CONFLICT_WEIGHT="0.004"
+ADAPTIVE_DS_UNKNOWN_REF="0.50"
+ADAPTIVE_DS_CONFLICT_REF="0.08"
+DYNAMIC_OBSTACLES_ENABLE="False"
+DYNAMIC_OBSTACLES_SPECS="0.0,1.8,0.75,0.30,1.30,0.0,1.2,9.0,0.0;5.0,-1.6,0.75,0.28,1.20,0.0,1.0,8.0,1.57;-5.5,2.2,0.75,0.26,1.10,0.8,0.7,10.0,3.14;9.0,-2.4,0.75,0.24,1.10,-0.7,0.9,11.0,0.78"
+DYNAMIC_OBSTACLES_RATE="15.0"
+DYNAMIC_OBSTACLES_SPACING="0.12"
 INIT_X="-15.0"
 INIT_Y="0.0"
 INIT_Z="0.1"
@@ -127,9 +141,23 @@ Usage: bash tools/compare_fusion.sh [options]
   --closed-loop-action-delay-sec FLOAT
   --closed-loop-action-history-sec FLOAT
   --closed-loop-window-sec FLOAT
+  --closed-loop-ds-feedback-enable True|False
+  --closed-loop-ds-unknown-weight FLOAT
+  --closed-loop-ds-conflict-weight FLOAT
+  --closed-loop-ds-unknown-ref FLOAT
+  --closed-loop-ds-conflict-ref FLOAT
   --ds-evidence-enable True|False
   --ds-unknown-floor FLOAT
   --ds-free-scale FLOAT
+  --adaptive-ds-score-enable True|False
+  --adaptive-ds-unknown-weight FLOAT
+  --adaptive-ds-conflict-weight FLOAT
+  --adaptive-ds-unknown-ref FLOAT
+  --adaptive-ds-conflict-ref FLOAT
+  --dynamic-obstacles-enable True|False
+  --dynamic-obstacles-specs SPEC
+  --dynamic-obstacles-rate FLOAT
+  --dynamic-obstacles-spacing FLOAT
   --init-x FLOAT
   --init-y FLOAT
   --init-z FLOAT
@@ -196,9 +224,23 @@ while [[ $# -gt 0 ]]; do
     --closed-loop-action-delay-sec) CLOSED_LOOP_ACTION_DELAY_SEC="$2"; shift 2 ;;
     --closed-loop-action-history-sec) CLOSED_LOOP_ACTION_HISTORY_SEC="$2"; shift 2 ;;
     --closed-loop-window-sec) CLOSED_LOOP_WINDOW_SEC="$2"; shift 2 ;;
+    --closed-loop-ds-feedback-enable) CLOSED_LOOP_DS_FEEDBACK_ENABLE="$2"; shift 2 ;;
+    --closed-loop-ds-unknown-weight) CLOSED_LOOP_DS_UNKNOWN_WEIGHT="$2"; shift 2 ;;
+    --closed-loop-ds-conflict-weight) CLOSED_LOOP_DS_CONFLICT_WEIGHT="$2"; shift 2 ;;
+    --closed-loop-ds-unknown-ref) CLOSED_LOOP_DS_UNKNOWN_REF="$2"; shift 2 ;;
+    --closed-loop-ds-conflict-ref) CLOSED_LOOP_DS_CONFLICT_REF="$2"; shift 2 ;;
     --ds-evidence-enable) DS_EVIDENCE_ENABLE="$2"; shift 2 ;;
     --ds-unknown-floor) DS_UNKNOWN_FLOOR="$2"; shift 2 ;;
     --ds-free-scale) DS_FREE_SCALE="$2"; shift 2 ;;
+    --adaptive-ds-score-enable) ADAPTIVE_DS_SCORE_ENABLE="$2"; shift 2 ;;
+    --adaptive-ds-unknown-weight) ADAPTIVE_DS_UNKNOWN_WEIGHT="$2"; shift 2 ;;
+    --adaptive-ds-conflict-weight) ADAPTIVE_DS_CONFLICT_WEIGHT="$2"; shift 2 ;;
+    --adaptive-ds-unknown-ref) ADAPTIVE_DS_UNKNOWN_REF="$2"; shift 2 ;;
+    --adaptive-ds-conflict-ref) ADAPTIVE_DS_CONFLICT_REF="$2"; shift 2 ;;
+    --dynamic-obstacles-enable) DYNAMIC_OBSTACLES_ENABLE="$2"; shift 2 ;;
+    --dynamic-obstacles-specs) DYNAMIC_OBSTACLES_SPECS="$2"; shift 2 ;;
+    --dynamic-obstacles-rate) DYNAMIC_OBSTACLES_RATE="$2"; shift 2 ;;
+    --dynamic-obstacles-spacing) DYNAMIC_OBSTACLES_SPACING="$2"; shift 2 ;;
     --init-x) INIT_X="$2"; shift 2 ;;
     --init-y) INIT_Y="$2"; shift 2 ;;
     --init-z) INIT_Z="$2"; shift 2 ;;
@@ -227,9 +269,9 @@ SIM_STATS_DIR="$OUT_DIR/${LABEL}_sim_stats"
 SIM_STATS_LOG="$OUT_DIR/${LABEL}.sim_stats.log"
 
 cleanup_existing_ros_processes() {
-  pkill -TERM -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
+  pkill -TERM -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|dynamic_obstacle_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
   sleep 2
-  pkill -KILL -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
+  pkill -KILL -f 'single_run_in_sim_fusion.launch.py|single_run_in_sim.launch.py|ego_planner_node|traj_server|poscmd_2_odom|odom_visualization|pcl_render_node|simulated_lidar_cloud.py|dynamic_obstacle_cloud.py|ros2_lidar_depth_fusion_node.py|mockamap_node|random_forest' 2>/dev/null || true
 }
 
 stop_pid() {
@@ -350,9 +392,23 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   closed_loop_action_delay_sec:="$CLOSED_LOOP_ACTION_DELAY_SEC" \
   closed_loop_action_history_sec:="$CLOSED_LOOP_ACTION_HISTORY_SEC" \
   closed_loop_window_sec:="$CLOSED_LOOP_WINDOW_SEC" \
+  closed_loop_ds_feedback_enable:="$CLOSED_LOOP_DS_FEEDBACK_ENABLE" \
+  closed_loop_ds_unknown_weight:="$CLOSED_LOOP_DS_UNKNOWN_WEIGHT" \
+  closed_loop_ds_conflict_weight:="$CLOSED_LOOP_DS_CONFLICT_WEIGHT" \
+  closed_loop_ds_unknown_ref:="$CLOSED_LOOP_DS_UNKNOWN_REF" \
+  closed_loop_ds_conflict_ref:="$CLOSED_LOOP_DS_CONFLICT_REF" \
   ds_evidence_enable:="$DS_EVIDENCE_ENABLE" \
   ds_unknown_floor:="$DS_UNKNOWN_FLOOR" \
   ds_free_scale:="$DS_FREE_SCALE" \
+  adaptive_ds_score_enable:="$ADAPTIVE_DS_SCORE_ENABLE" \
+  adaptive_ds_unknown_weight:="$ADAPTIVE_DS_UNKNOWN_WEIGHT" \
+  adaptive_ds_conflict_weight:="$ADAPTIVE_DS_CONFLICT_WEIGHT" \
+  adaptive_ds_unknown_ref:="$ADAPTIVE_DS_UNKNOWN_REF" \
+  adaptive_ds_conflict_ref:="$ADAPTIVE_DS_CONFLICT_REF" \
+  dynamic_obstacles_enable:="$DYNAMIC_OBSTACLES_ENABLE" \
+  dynamic_obstacles_specs:="$DYNAMIC_OBSTACLES_SPECS" \
+  dynamic_obstacles_rate:="$DYNAMIC_OBSTACLES_RATE" \
+  dynamic_obstacles_spacing:="$DYNAMIC_OBSTACLES_SPACING" \
   >"$LAUNCH_LOG" 2>&1 &
 LAUNCH_PID=$!
 
@@ -372,6 +428,8 @@ REPORT_PID=$!
   --global-cloud-topic /map_generator/global_cloud \
   --occupancy-topic /drone_0_grid/grid_map/occupancy_inflate \
   --odom-topic /drone_0_visual_slam/odom \
+  --ds-metrics-topic /drone_0_fusion/ds_metrics \
+  --dynamic-obstacle-topic /drone_0_dynamic_obstacles/cloud \
   --launch-log-path "$LAUNCH_LOG" \
   --goal-x "$POINT0_X" \
   --goal-y "$POINT0_Y" \
