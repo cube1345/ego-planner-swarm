@@ -25,6 +25,7 @@ def generate_launch_description():
     min_dist = LaunchConfiguration('min_dist', default=1.0)
     odometry_topic = LaunchConfiguration('odometry_topic', default='visual_slam/odom')
     drone_id = LaunchConfiguration('drone_id', default=0)
+    dynamic_cloud_topic = LaunchConfiguration('dynamic_cloud_topic', default='/drone_0_dynamic_obstacles/cloud')
 
     # DeclareLaunchArguments
     init_x_arg = DeclareLaunchArgument('init_x_', default_value=init_x, description='Initial X position')
@@ -39,6 +40,7 @@ def generate_launch_description():
     min_dist_arg = DeclareLaunchArgument('min_dist', default_value=min_dist, description='Minimum distance')
     odometry_topic_arg = DeclareLaunchArgument('odometry_topic', default_value=odometry_topic, description='Odometry topic')
     drone_id_arg = DeclareLaunchArgument('drone_id', default_value=drone_id, description='Drone ID')
+    dynamic_cloud_topic_arg = DeclareLaunchArgument('dynamic_cloud_topic', default_value=dynamic_cloud_topic, description='Dynamic obstacle cloud topic')
     
     # 地图属性以及是否使用动力学仿真
     use_mockamap = LaunchConfiguration('use_mockamap', default=False) # map_generator or mockamap 
@@ -193,6 +195,7 @@ def generate_launch_description():
         remappings=[
             ('odom', ['drone_', drone_id, '_visual_slam/odom']),
             ('robot', ['drone_', drone_id, '_vis/robot']),
+            ('robot_body', ['drone_', drone_id, '_vis/robot_body']),
             ('path', ['drone_', drone_id, '_vis/path']),
             ('time_gap', ['drone_', drone_id, '_vis/time_gap']),
             # ('pose', ['drone_', drone_id, '_vis/pose']),
@@ -205,11 +208,11 @@ def generate_launch_description():
         ],
         parameters=[
             {'color/a': 1.0},
-            {'color/r': 0.0},
-            {'color/g': 0.0},
-            {'color/b': 0.0},
+            {'color/r': 1.0},
+            {'color/g': 0.28},
+            {'color/b': 0.05},
             {'covariance_scale': 100.0},
-            {'robot_scale': 1.0},
+            {'robot_scale': 1.6},
             {'tf45': False},
             {'drone_id': drone_id}
         ]
@@ -237,6 +240,7 @@ def generate_launch_description():
         ],
         remappings=[
             ('global_map', '/map_generator/global_cloud'),
+            ('local_map', dynamic_cloud_topic),
             ('odometry', ['drone_', drone_id, '_', odometry_topic]),
             ('pcl_render_node/cloud', ['drone_', drone_id, '_pcl_render_node/cloud']),
             ('depth', ['drone_', drone_id, '_pcl_render_node/depth'])
@@ -259,6 +263,7 @@ def generate_launch_description():
     ld.add_action(min_dist_arg)
     ld.add_action(odometry_topic_arg)
     ld.add_action(drone_id_arg)
+    ld.add_action(dynamic_cloud_topic_arg)
     
     ld.add_action(use_mockamap_arg)
     ld.add_action(use_dynamic_arg)

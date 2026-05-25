@@ -2,28 +2,41 @@
 
 // #define current_img_ md_.depth_image_[image_cnt_ & 1]
 // #define last_img_ md_.depth_image_[!(image_cnt_ & 1)]
-
+/*
+ * @brief Initialize the grid map
+ * @param node The ROS node
+ */
 void GridMap::initMap(rclcpp::Node::SharedPtr node)
 {
   node_ = node;
 
   /* get parameter */
   double x_size, y_size, z_size;
+  // 声明参数并获取参数值
+  // reolution: 分辨率
+  // -1.0表示未设置，程序会报错提示用户设置参数
+  // map_size_x/y/z: 地图尺寸
   node_->declare_parameter("grid_map/resolution", -1.0);
   node_->declare_parameter("grid_map/map_size_x", -1.0);
   node_->declare_parameter("grid_map/map_size_y", -1.0);
   node_->declare_parameter("grid_map/map_size_z", -1.0);
+  // local_update_range_x/y/z: 局部更新范围，单位为米，超过这个范围的点云将不会被用来更新地图
   node_->declare_parameter("grid_map/local_update_range_x", -1.0);
   node_->declare_parameter("grid_map/local_update_range_y", -1.0);
   node_->declare_parameter("grid_map/local_update_range_z", -1.0);
+  // obstacles_inflation: 障碍物膨胀半径，单位为米，在更新地图时会将障碍物周围一定范围内的体素也标记为占用
   node_->declare_parameter("grid_map/obstacles_inflation", -1.0);
+  // self_clearance_xy/z: 自身清除范围，单位为米，用于避免机器人与障碍物发生碰撞，在更新地图时会将机器人周围一定范围内的体素标记为自由
   node_->declare_parameter("grid_map/self_clearance_xy", 0.35);
   node_->declare_parameter("grid_map/self_clearance_z", 0.25);
+  // fx/fy/cx/cy: 相机内参，用于将深度图像中的像素坐标转换为相机坐标系中的三维坐标
   node_->declare_parameter("grid_map/fx", -1.0);
   node_->declare_parameter("grid_map/fy", -1.0);
   node_->declare_parameter("grid_map/cx", -1.0);
   node_->declare_parameter("grid_map/cy", -1.0);
+  // use_depth_filter: 是否使用深度图像过滤器，用于去除深度图像中的噪声和异常值
   node_->declare_parameter("grid_map/use_depth_filter", true);
+  // depth_filter_tolerance: 深度图像过滤器的容差，单位为米，在过滤深度图像时会去除与周围像素深度差异超过该值的像素
   node_->declare_parameter("grid_map/depth_filter_tolerance", -1.0);
   node_->declare_parameter("grid_map/depth_filter_maxdist", -1.0);
   node_->declare_parameter("grid_map/depth_filter_mindist", -1.0);
@@ -87,11 +100,13 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   node_->get_parameter("grid_map/ground_height", mp_.ground_height_);
   node_->get_parameter("grid_map/odom_depth_timeout", mp_.odom_depth_timeout_);
 
+  // 确保虚拟天花板高度不超过地图范围
   if (mp_.virtual_ceil_height_ - mp_.ground_height_ > z_size)
   {
     mp_.virtual_ceil_height_ = mp_.ground_height_ + z_size;
   }
 
+  // 计算地图相关参数
   mp_.resolution_inv_ = 1 / mp_.resolution_;
   mp_.map_origin_ = Eigen::Vector3d(-x_size / 2.0, -y_size / 2.0, mp_.ground_height_);
   mp_.map_size_ = Eigen::Vector3d(x_size, y_size, z_size);
@@ -109,16 +124,24 @@ void GridMap::initMap(rclcpp::Node::SharedPtr node)
   cout << "max: " << mp_.clamp_max_log_ << endl;
   cout << "thresh log: " << mp_.min_occupancy_log_ << endl;
 
+  // 计算地图体素数量和边界
+  // ceil函数向上取整，确保地图尺寸能够被分辨率整除
   for (int i = 0; i < 3; ++i)
     mp_.map_voxel_num_(i) = ceil(mp_.map_size_(i) / mp_.resolution_);
 
+  // 地图边界
   mp_.map_min_boundary_ = mp_.map_origin_;
   mp_.map_max_boundary_ = mp_.map_origin_ + mp_.map_size_;
 
   // initialize data buffers
 
+  // 初始化数据缓冲区，occupancy_buffer_用于存储每个体素的占用概率（以对数形式），occupancy_buffer_inflate_用于存储膨胀后的占用状态，count_hit_and_miss_和count_hit_用于统计每个体素被观测到的次数和被占用观测到的次数，flag_rayend_和flag_traverse_用于标记射线投射过程中访问过的体素，proj_points_用于存储从深度图像投影到世界坐标系中的点云数据。
   int buffer_size = mp_.map_voxel_num_(0) * mp_.map_voxel_num_(1) * mp_.map_voxel_num_(2);
 
+  // occupancy_buffer_初始化为一个大小为buffer_size的向量，每个元素的初始值为mp_.clamp_min_log_ - mp_.unknown_flag_，表示初始状态下所有体素的占用概率都非常低（接近于未知状态）。
+  // occupancy_buffer_inflate_初始化为一个大小为buffer_size的字符向量，每个元素的初始值为0，表示初始状态下所有体素都没有被膨胀。
+  // count_hit_and_miss_和count_hit_初始化为大小为buffer_size的短整数向量，每个元素的初始值为0，表示初始状态下所有体素都没有被观测到。
+  // flag_rayend_和flag_traverse_初始化为大小为buffer_size的字符向量，每个元素的初始值为-1，表示初始状态下所有体素都没有被访问过。
   md_.occupancy_buffer_ = vector<double>(buffer_size, mp_.clamp_min_log_ - mp_.unknown_flag_);
   md_.occupancy_buffer_inflate_ = vector<char>(buffer_size, 0);
 

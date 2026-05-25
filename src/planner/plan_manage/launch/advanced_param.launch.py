@@ -23,6 +23,10 @@ def generate_launch_description():
     max_vel = LaunchConfiguration('max_vel', default=2.0)
     max_acc = LaunchConfiguration('max_acc', default=3.0)
     planning_horizon = LaunchConfiguration('planning_horizon', default=7.5)
+    local_update_range_x = LaunchConfiguration('local_update_range_x', default=5.5)
+    local_update_range_y = LaunchConfiguration('local_update_range_y', default=5.5)
+    local_update_range_z = LaunchConfiguration('local_update_range_z', default=4.5)
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation', default=0.099)
     
     point_num = LaunchConfiguration('point_num', default=1)
     point0_x = LaunchConfiguration('point0_x', default=0.0)
@@ -63,6 +67,10 @@ def generate_launch_description():
     max_vel_arg = DeclareLaunchArgument('max_vel', default_value=max_vel, description='Maximum velocity')
     max_acc_arg = DeclareLaunchArgument('max_acc', default_value=max_acc, description='Maximum acceleration')
     planning_horizon_arg = DeclareLaunchArgument('planning_horizon', default_value=planning_horizon, description='Planning horizon')
+    local_update_range_x_arg = DeclareLaunchArgument('local_update_range_x', default_value=local_update_range_x, description='Local map update range X')
+    local_update_range_y_arg = DeclareLaunchArgument('local_update_range_y', default_value=local_update_range_y, description='Local map update range Y')
+    local_update_range_z_arg = DeclareLaunchArgument('local_update_range_z', default_value=local_update_range_z, description='Local map update range Z')
+    obstacles_inflation_arg = DeclareLaunchArgument('obstacles_inflation', default_value=obstacles_inflation, description='Obstacle inflation radius')
     
     point_num_arg = DeclareLaunchArgument('point_num', default_value=point_num, description='Number of waypoints')
     point0_x_arg = DeclareLaunchArgument('point0_x', default_value=point0_x, description='Waypoint 0 X coordinate')
@@ -142,10 +150,10 @@ def generate_launch_description():
             {'grid_map/map_size_x': map_size_x},
             {'grid_map/map_size_y': map_size_y},
             {'grid_map/map_size_z': map_size_z},
-            {'grid_map/local_update_range_x': 5.5},
-            {'grid_map/local_update_range_y': 5.5},
-            {'grid_map/local_update_range_z': 4.5},
-            {'grid_map/obstacles_inflation': 0.099},
+            {'grid_map/local_update_range_x': local_update_range_x},
+            {'grid_map/local_update_range_y': local_update_range_y},
+            {'grid_map/local_update_range_z': local_update_range_z},
+            {'grid_map/obstacles_inflation': obstacles_inflation},
             {'grid_map/self_clearance_xy': 0.35},
             {'grid_map/self_clearance_z': 0.25},
             {'grid_map/local_map_margin': 10},
@@ -226,6 +234,10 @@ def generate_launch_description():
     ld.add_action(max_vel_arg)
     ld.add_action(max_acc_arg)
     ld.add_action(planning_horizon_arg)
+    ld.add_action(local_update_range_x_arg)
+    ld.add_action(local_update_range_y_arg)
+    ld.add_action(local_update_range_z_arg)
+    ld.add_action(obstacles_inflation_arg)
     
     ld.add_action(point_num_arg)
     ld.add_action(point0_x_arg)

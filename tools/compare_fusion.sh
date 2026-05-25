@@ -52,7 +52,6 @@ ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
 CLOSED_LOOP_FEEDBACK_ENABLE="True"
 CLOSED_LOOP_FEEDBACK_WEIGHT="0.05"
-CLOSED_LOOP_OPTIMIZER_ENABLE="False"
 CLOSED_LOOP_LOCAL_SCORE_WEIGHT="1.0"
 CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="0.30"
 CLOSED_LOOP_ACTION_DELAY_SEC="3.0"
@@ -82,6 +81,12 @@ POINT_NUM="1"
 POINT0_X="15.0"
 POINT0_Y="0.0"
 POINT0_Z="1.0"
+MAX_VEL="1.5"
+MAX_ACC="6.0"
+LOCAL_UPDATE_RANGE_X="5.5"
+LOCAL_UPDATE_RANGE_Y="5.5"
+LOCAL_UPDATE_RANGE_Z="4.5"
+OBSTACLES_INFLATION="0.099"
 
 usage() {
   cat <<'EOF'
@@ -135,7 +140,6 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-score-alpha FLOAT
   --closed-loop-feedback-enable True|False
   --closed-loop-feedback-weight FLOAT
-  --closed-loop-optimizer-enable True|False
   --closed-loop-local-score-weight FLOAT
   --closed-loop-candidate-score-alpha FLOAT
   --closed-loop-action-delay-sec FLOAT
@@ -165,6 +169,12 @@ Usage: bash tools/compare_fusion.sh [options]
   --point0-x FLOAT
   --point0-y FLOAT
   --point0-z FLOAT
+  --max-vel FLOAT
+  --max-acc FLOAT
+  --local-update-range-x FLOAT
+  --local-update-range-y FLOAT
+  --local-update-range-z FLOAT
+  --obstacles-inflation FLOAT
 EOF
 }
 
@@ -218,7 +228,6 @@ while [[ $# -gt 0 ]]; do
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
     --closed-loop-feedback-enable) CLOSED_LOOP_FEEDBACK_ENABLE="$2"; shift 2 ;;
     --closed-loop-feedback-weight) CLOSED_LOOP_FEEDBACK_WEIGHT="$2"; shift 2 ;;
-    --closed-loop-optimizer-enable) CLOSED_LOOP_OPTIMIZER_ENABLE="$2"; shift 2 ;;
     --closed-loop-local-score-weight) CLOSED_LOOP_LOCAL_SCORE_WEIGHT="$2"; shift 2 ;;
     --closed-loop-candidate-score-alpha) CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="$2"; shift 2 ;;
     --closed-loop-action-delay-sec) CLOSED_LOOP_ACTION_DELAY_SEC="$2"; shift 2 ;;
@@ -248,6 +257,12 @@ while [[ $# -gt 0 ]]; do
     --point0-x) POINT0_X="$2"; shift 2 ;;
     --point0-y) POINT0_Y="$2"; shift 2 ;;
     --point0-z) POINT0_Z="$2"; shift 2 ;;
+    --max-vel) MAX_VEL="$2"; shift 2 ;;
+    --max-acc) MAX_ACC="$2"; shift 2 ;;
+    --local-update-range-x) LOCAL_UPDATE_RANGE_X="$2"; shift 2 ;;
+    --local-update-range-y) LOCAL_UPDATE_RANGE_Y="$2"; shift 2 ;;
+    --local-update-range-z) LOCAL_UPDATE_RANGE_Z="$2"; shift 2 ;;
+    --obstacles-inflation) OBSTACLES_INFLATION="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "unknown argument: $1" >&2
@@ -345,6 +360,12 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   point0_x:="$POINT0_X" \
   point0_y:="$POINT0_Y" \
   point0_z:="$POINT0_Z" \
+  max_vel:="$MAX_VEL" \
+  max_acc:="$MAX_ACC" \
+  local_update_range_x:="$LOCAL_UPDATE_RANGE_X" \
+  local_update_range_y:="$LOCAL_UPDATE_RANGE_Y" \
+  local_update_range_z:="$LOCAL_UPDATE_RANGE_Z" \
+  obstacles_inflation:="$OBSTACLES_INFLATION" \
   near_field_radius:="$NEAR_FIELD_RADIUS" \
   adaptive_near_field_radius_enable:="$ADAPTIVE_NEAR_FIELD_RADIUS_ENABLE" \
   adaptive_near_field_radius_min:="$ADAPTIVE_NEAR_FIELD_RADIUS_MIN" \
@@ -386,7 +407,7 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   adaptive_score_alpha:="$ADAPTIVE_SCORE_ALPHA" \
   closed_loop_feedback_enable:="$CLOSED_LOOP_FEEDBACK_ENABLE" \
   closed_loop_feedback_weight:="$CLOSED_LOOP_FEEDBACK_WEIGHT" \
-  closed_loop_optimizer_enable:="$CLOSED_LOOP_OPTIMIZER_ENABLE" \
+  closed_loop_optimizer_enable:="False" \
   closed_loop_local_score_weight:="$CLOSED_LOOP_LOCAL_SCORE_WEIGHT" \
   closed_loop_candidate_score_alpha:="$CLOSED_LOOP_CANDIDATE_SCORE_ALPHA" \
   closed_loop_action_delay_sec:="$CLOSED_LOOP_ACTION_DELAY_SEC" \

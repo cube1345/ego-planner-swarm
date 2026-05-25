@@ -930,9 +930,10 @@ class LidarDepthFusionNode(Node):
                                 dual_key,
                             )
                             utility = self.closed_loop_local_score_weight * local_utility
-                            utility -= self.compute_ds_candidate_penalty(
+                            ds_penalty = self.compute_ds_candidate_penalty(
                                 predicted, candidate_state
                             )
+                            utility -= ds_penalty
                             utility += self.closed_loop_candidate_bonus(candidate_key)
                             if self.adaptive_retention_enable:
                                 retention_ratio = len(predicted) / max(1, candidate_state["candidate_voxels"])

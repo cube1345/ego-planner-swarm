@@ -1,6 +1,71 @@
 # Changelog
 
-## 2026-05-03
+## 2026-05-25
+
+### README And Usage Docs
+
+- Added `README.md` as the English usage entry for the current ROS 2 UAV avoidance stack.
+- Added `README.zh-CN.md` as the Chinese usage entry.
+- Replaced legacy `Readme.md` content with a short pointer to the standard English and Chinese README files.
+- Kept README content focused on project purpose, build, RViz simulation startup, headless evaluation, and stopping simulation.
+
+## 2026-05-24(bash scripts)
+
+### One-Command Simulation Launcher
+
+- Added `tools/start_rviz_sim.sh` for one-command simulation startup.
+- The launcher clears stale ROS / RViz processes before starting a new run.
+- Supported launch modes:
+  - `--mode fusion`
+  - `--mode plain`
+  - `--no-rviz`
+  - `--kill-only`
+- Default RViz config remains `src/planner/plan_manage/launch/drone0_clean.rviz`.
+
+## 2026-05-10
+
+### RViz And UAV Visualization
+
+- Updated `drone0_clean.rviz` so the default UAV display uses the original `/drone_0_vis/robot` hummingbird mesh.
+- Added a disabled-by-default `/drone_0_vis/robot_body` fallback marker display for debugging mesh visibility issues.
+- Updated `odom_visualization` to publish a lightweight fallback body marker while keeping the original mesh marker path.
+- Adjusted simulator visualization parameters so the UAV mesh is easier to see in RViz.
+
+## 2026-04-20(in Dynamic)
+
+### Multimodal Fusion And Dynamic Simulation Support
+
+- Kept the fusion simulation path based on `single_run_in_sim_fusion.launch.py`.
+- Confirmed the current fusion chain uses depth cloud, simulated LiDAR cloud, fused cloud, D-S metrics, and closed-loop feedback observation.
+- Added / retained dynamic obstacle cloud support through `dynamic_obstacle_cloud.py`.
+- Dynamic obstacle outputs include:
+  - `/drone_0_dynamic_obstacles/cloud`
+  - `/drone_0_dynamic_obstacles/markers`
+- Dynamic obstacle metrics are available through the headless stats pipeline, including minimum dynamic obstacle distance, dynamic safety violation ratio, and dynamic collision risk score.
+
+## 2026-04-10（docs）
+
+### Paper And Documentation
+
+- Added `docs/ego_planner_multimodal_fusion_paper.md` as the main paper-style project document.
+- Expanded the paper with detailed mathematical descriptions for:
+  - multimodal voxel fusion
+  - distance-adaptive confidence
+  - Log-odds evidence accumulation
+  - Dempster-Shafer evidence metrics
+  - online adaptive parameter selection
+  - closed-loop feedback and delayed attribution
+- Added a short dynamic obstacle simulation and safety-metric section to the paper.
+
+
+### Current Engineering Position
+
+- The stable default demo path remains static-obstacle RViz simulation with the fusion chain available through `tools/start_rviz_sim.sh --mode fusion`.
+- Dynamic obstacle support is treated as simulation and evaluation extension rather than a fully validated standalone dynamic-avoidance algorithm.
+- Closed-loop feedback remains useful for observation and metrics; the online closed-loop optimizer remains disabled by default.
+
+### ds？...
+
 
 ### Simulation And RViz
 
@@ -9,12 +74,16 @@
 - Added `tools/run_adaptive_rviz_demo.sh` to clear stale ROS / RViz processes before launching one clean adaptive fusion demo.
 - Documented the operational difference between the original non-fusion chain and the adaptive fusion chain.
 
+
+
 ### Headless Metrics
 
 - Fixed duplicate shutdown handling in `src/planner/plan_manage/scripts/fusion_benefit_report.py`.
 - Fixed `tools/sim_flight_stats_report.py` so `replan_count` is counted from the final batch `launch.log`.
 - Changed `tools/sim_flight_stats_report.py` to finish on external stop rather than timing out early, preventing tail-end replans from being dropped.
 - Changed `tools/compare_fusion.sh` stop order to stop launch first, then stats, then report, so final counts match the completed run.
+
+## ？？
 
 ### Documentation Refresh
 
@@ -23,13 +92,13 @@
 - Updated `docs/multimodal_fusion_code_walkthrough.md` to reflect the current code path and the actual active adaptive-parameter logic.
 - Updated `docs/multimodal_fusion_paper_style.md` to align the paper-style description with the current engineering implementation.
 
+
 ### Adaptive Parameter Status
 
 - Clarified that the current project has only one truly online adaptive parameter: fusion-layer `min_probability`.
 - Clarified that `adaptive_min_probability_min/max/step`, `adaptive_eval_range`, `adaptive_min_gt_voxels`, and `adaptive_score_alpha` are controller hyperparameters for the adaptation process rather than independently adapted runtime parameters.
 - Clarified that `adaptive_target_retention` and `adaptive_retention_band` are declared but are not part of the current online decision logic.
 
-## 2026-04-12
 
 ### Multimodal Fusion
 

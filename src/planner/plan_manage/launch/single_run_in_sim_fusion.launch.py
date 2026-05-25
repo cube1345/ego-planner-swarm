@@ -100,6 +100,12 @@ def launch_setup(context, *args, **kwargs):
     dynamic_obstacles_specs = LaunchConfiguration('dynamic_obstacles_specs').perform(context)
     dynamic_obstacles_rate = LaunchConfiguration('dynamic_obstacles_rate').perform(context)
     dynamic_obstacles_spacing = LaunchConfiguration('dynamic_obstacles_spacing').perform(context)
+    max_vel = LaunchConfiguration('max_vel').perform(context)
+    max_acc = LaunchConfiguration('max_acc').perform(context)
+    local_update_range_x = LaunchConfiguration('local_update_range_x').perform(context)
+    local_update_range_y = LaunchConfiguration('local_update_range_y').perform(context)
+    local_update_range_z = LaunchConfiguration('local_update_range_z').perform(context)
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
@@ -178,9 +184,13 @@ def launch_setup(context, *args, **kwargs):
             'cy': str(243.44969177246094),
             'fx': str(387.229248046875),
             'fy': str(387.229248046875),
-            'max_vel': str(2.0),
-            'max_acc': str(6.0),
+            'max_vel': max_vel,
+            'max_acc': max_acc,
             'planning_horizon': str(7.5),
+            'local_update_range_x': local_update_range_x,
+            'local_update_range_y': local_update_range_y,
+            'local_update_range_z': local_update_range_z,
+            'obstacles_inflation': obstacles_inflation,
             'use_distinctive_trajs': 'True',
             'flight_type': str(2),
             'point_num': point_num,
@@ -465,5 +475,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument('dynamic_obstacles_rate', default_value='15.0'),
         DeclareLaunchArgument('dynamic_obstacles_spacing', default_value='0.12'),
+        DeclareLaunchArgument('max_vel', default_value='1.5'),
+        DeclareLaunchArgument('max_acc', default_value='6.0'),
+        DeclareLaunchArgument('local_update_range_x', default_value='5.5'),
+        DeclareLaunchArgument('local_update_range_y', default_value='5.5'),
+        DeclareLaunchArgument('local_update_range_z', default_value='4.5'),
+        DeclareLaunchArgument('obstacles_inflation', default_value='0.099'),
         OpaqueFunction(function=launch_setup),
     ])

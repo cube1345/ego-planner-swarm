@@ -9,6 +9,7 @@
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "nav_msgs/msg/path.hpp"
 #include "sensor_msgs/msg/range.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include "visualization_msgs/msg/marker.hpp"
 #include "armadillo"
 #include "pose_utils/pose_utils.h"
@@ -38,6 +39,7 @@ rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr covVelPub;
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr trajPub;
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr sensorPub;
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr meshPub;
+rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr bodyPub;
 rclcpp::Publisher<sensor_msgs::msg::Range>::SharedPtr heightPub;
 
 // tf2_ros::TransformBroadcaster *broadcaster;
@@ -51,6 +53,7 @@ visualization_msgs::msg::Marker covVelROS;
 visualization_msgs::msg::Marker trajROS;
 visualization_msgs::msg::Marker sensorROS;
 visualization_msgs::msg::Marker meshROS;
+visualization_msgs::msg::Marker bodyROS;
 sensor_msgs::msg::Range heightROS;
 string _frame_id;
 int _drone_id;
@@ -61,6 +64,46 @@ rclcpp::Time debug_time_last = rclcpp::Clock().now();
 double time_gap = 0;
 std_msgs::msg::Float64 time_message;
 rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr timePub;
+
+void publish_body_marker(const rclcpp::Time &stamp, double x, double y, double z)
+{
+    bodyROS.header.frame_id = _frame_id;
+    bodyROS.header.stamp = stamp;
+    bodyROS.ns = "drone_body";
+    bodyROS.id = 0;
+    bodyROS.type = visualization_msgs::msg::Marker::LINE_LIST;
+    bodyROS.action = visualization_msgs::msg::Marker::ADD;
+    bodyROS.pose.position.x = x;
+    bodyROS.pose.position.y = y;
+    bodyROS.pose.position.z = z;
+    bodyROS.pose.orientation.w = 1.0;
+    bodyROS.pose.orientation.x = 0.0;
+    bodyROS.pose.orientation.y = 0.0;
+    bodyROS.pose.orientation.z = 0.0;
+    bodyROS.scale.x = 0.08 * scale;
+    bodyROS.color.a = 1.0;
+    bodyROS.color.r = 0.0;
+    bodyROS.color.g = 0.85;
+    bodyROS.color.b = 1.0;
+    bodyROS.points.clear();
+
+    const double arm = 0.45 * scale;
+    geometry_msgs::msg::Point p;
+    p.x = -arm; p.y = 0.0; p.z = 0.0;
+    bodyROS.points.push_back(p);
+    p.x = arm; p.y = 0.0; p.z = 0.0;
+    bodyROS.points.push_back(p);
+    p.x = 0.0; p.y = -arm; p.z = 0.0;
+    bodyROS.points.push_back(p);
+    p.x = 0.0; p.y = arm; p.z = 0.0;
+    bodyROS.points.push_back(p);
+    p.x = 0.0; p.y = 0.0; p.z = -0.25 * scale;
+    bodyROS.points.push_back(p);
+    p.x = 0.0; p.y = 0.0; p.z = 0.25 * scale;
+    bodyROS.points.push_back(p);
+
+    bodyPub->publish(bodyROS);
+}
 
 void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
@@ -373,6 +416,11 @@ void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
     meshROS.color.b = color_b;
     meshROS.mesh_resource = mesh_resource;
     meshPub->publish(meshROS);
+    publish_body_marker(
+        msg->header.stamp,
+        msg->pose.pose.position.x,
+        msg->pose.pose.position.y,
+        msg->pose.pose.position.z);
     debug_time = rclcpp::Clock().now();
     time_gap = (debug_time - debug_time_last).seconds();
     time_message.data = time_gap;
@@ -500,6 +548,11 @@ void cmd_callback(const quadrotor_msgs::msg::PositionCommand cmd)
     meshROS.color.b = color_b;
     meshROS.mesh_resource = mesh_resource;
     meshPub->publish(meshROS);
+    publish_body_marker(
+        cmd.header.stamp,
+        cmd.position.x,
+        cmd.position.y,
+        cmd.position.z);
 }
 
 int main(int argc, char **argv)
@@ -556,6 +609,7 @@ int main(int argc, char **argv)
     trajPub = node->create_publisher<visualization_msgs::msg::Marker>("trajectory", 100);
     sensorPub = node->create_publisher<visualization_msgs::msg::Marker>("sensor", 100);
     meshPub = node->create_publisher<visualization_msgs::msg::Marker>("robot", 100);
+    bodyPub = node->create_publisher<visualization_msgs::msg::Marker>("robot_body", 100);
     heightPub = node->create_publisher<sensor_msgs::msg::Range>("height", 100);
 
     timePub = node->create_publisher<std_msgs::msg::Float64>("time_gap", 100);

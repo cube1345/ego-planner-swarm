@@ -191,6 +191,19 @@ void renderSensedPoints()
 }
 
 vector<float> cloud_data;
+vector<float> global_cloud_data;
+vector<float> local_cloud_data;
+
+void refreshRenderCloud()
+{
+  cloud_data.clear();
+  cloud_data.reserve(global_cloud_data.size() + local_cloud_data.size());
+  cloud_data.insert(cloud_data.end(), global_cloud_data.begin(), global_cloud_data.end());
+  cloud_data.insert(cloud_data.end(), local_cloud_data.begin(), local_cloud_data.end());
+  if (!cloud_data.empty())
+    depthrender.set_data(cloud_data);
+}
+
 // 接收全局地图信息的回调
 void rcvGlobalPointCloudCallBack(const sensor_msgs::msg::PointCloud2::SharedPtr pointcloud_map)
 {
@@ -204,21 +217,19 @@ void rcvGlobalPointCloudCallBack(const sensor_msgs::msg::PointCloud2::SharedPtr 
   pcl::PointXYZ pt_in;
   pcl::fromROSMsg(*pointcloud_map, cloudIn); 
 
+  global_cloud_data.clear();
+  global_cloud_data.reserve(cloudIn.points.size() * 3);
   for(int i = 0; i < int(cloudIn.points.size()); i++){
     pt_in = cloudIn.points[i];
-    cloud_data.push_back(pt_in.x);
-    cloud_data.push_back(pt_in.y);
-    cloud_data.push_back(pt_in.z);
+    global_cloud_data.push_back(pt_in.x);
+    global_cloud_data.push_back(pt_in.y);
+    global_cloud_data.push_back(pt_in.z);
   }
 
-  printf("global map has points: %d.\n", (int)cloud_data.size() / 3 );
-  std::cout<< "global map has points: " << (int)cloud_data.size() / 3 << std::endl;
+  printf("global map has points: %d.\n", (int)global_cloud_data.size() / 3 );
+  std::cout<< "global map has points: " << (int)global_cloud_data.size() / 3 << std::endl;
 
-  // Pass cloud_data to depth render
-  depthrender.set_data(cloud_data);
-  
-  // Allocate depth_hostptr
-  depth_hostptr = (int*)malloc(width * height * sizeof(int));
+  refreshRenderCloud();
 
   has_global_map = true;
 }
@@ -232,18 +243,19 @@ void rcvLocalPointCloudCallBack(const sensor_msgs::msg::PointCloud2::SharedPtr p
   pcl::fromROSMsg(*pointcloud_map, cloudIn);  
 
   if(cloudIn.points.size() == 0) return;
+  local_cloud_data.clear();
+  local_cloud_data.reserve(cloudIn.points.size() * 3);
   for(int i = 0; i < int(cloudIn.points.size()); i++){
     pt_in = cloudIn.points[i];
     Eigen::Vector3d pose_pt(pt_in.x, pt_in.y, pt_in.z);
     //pose_pt = gridIndex2coord(coord2gridIndex(pose_pt));
-    cloud_data.push_back(pose_pt(0));
-    cloud_data.push_back(pose_pt(1));
-    cloud_data.push_back(pose_pt(2));
+    local_cloud_data.push_back(pose_pt(0));
+    local_cloud_data.push_back(pose_pt(1));
+    local_cloud_data.push_back(pose_pt(2));
   }
   //printf("local map has points: %d.\n", (int)cloud_data.size() / 3 );
-  //pass cloud_data to depth render
-  depthrender.set_data(cloud_data);
-  depth_hostptr = (int*)malloc(width * height * sizeof(int));
+  // Refresh dynamic local obstacles without leaving stale obstacle trails.
+  refreshRenderCloud();
 
   has_local_map = true;
 }
@@ -397,6 +409,7 @@ int main(int argc, char **argv) {
 
   std::cout<< "camera parameter" << fx << fy << cx << cy << width << height << std::endl;
   depthrender.set_para(fx, fy, cx, cy, width, height);
+  depth_hostptr = (int*)malloc(width * height * sizeof(int));
 
   // cam02body <<  0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
   //               0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,

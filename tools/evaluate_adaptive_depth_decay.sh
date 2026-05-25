@@ -26,6 +26,7 @@ Usage: bash tools/evaluate_adaptive_depth_decay.sh [options]
 EOF
 }
 
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out-dir) OUT_DIR="$2"; shift 2 ;;

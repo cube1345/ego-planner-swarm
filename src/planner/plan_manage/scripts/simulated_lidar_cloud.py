@@ -18,6 +18,8 @@ class SimulatedLidarCloud(Node):
         super().__init__('simulated_lidar_cloud')
 
         self.declare_parameter('global_cloud_topic', '/map_generator/global_cloud')
+        self.declare_parameter('dynamic_cloud_topic', '')
+        self.declare_parameter('dynamic_cloud_timeout_sec', 0.5)
         self.declare_parameter('odom_topic', '/drone_0_visual_slam/odom')
         self.declare_parameter('lidar_points_topic', '/drone_0_lidar/points')
         self.declare_parameter('frame_id', 'world')
@@ -33,6 +35,8 @@ class SimulatedLidarCloud(Node):
         self.declare_parameter('force_zero_stamp', False)
 
         self.global_cloud_topic = str(self.get_parameter('global_cloud_topic').value)
+        self.dynamic_cloud_topic = str(self.get_parameter('dynamic_cloud_topic').value).strip()
+        self.dynamic_cloud_timeout_sec = float(self.get_parameter('dynamic_cloud_timeout_sec').value)
         self.odom_topic = str(self.get_parameter('odom_topic').value)
         self.lidar_points_topic = str(self.get_parameter('lidar_points_topic').value)
         self.frame_id = str(self.get_parameter('frame_id').value)
@@ -53,15 +57,20 @@ class SimulatedLidarCloud(Node):
         self.yaw = 0.0
         self.last_odom_stamp = None
         self.global_points = np.empty((0, 3), dtype=np.float32)
+        self.dynamic_points = np.empty((0, 3), dtype=np.float32)
+        self.last_dynamic_wall = 0.0
         self.rng = np.random.default_rng(7)
 
         self.create_subscription(PointCloud2, self.global_cloud_topic, self.global_cloud_callback, 10)
+        if self.dynamic_cloud_topic:
+            self.create_subscription(PointCloud2, self.dynamic_cloud_topic, self.dynamic_cloud_callback, 10)
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 20)
         self.pub = self.create_publisher(PointCloud2, self.lidar_points_topic, 10)
         self.timer = self.create_timer(1.0 / max(1e-3, self.publish_rate), self.publish_cloud)
 
         self.get_logger().info(
-            f'simulated lidar ready. global={self.global_cloud_topic} odom={self.odom_topic} out={self.lidar_points_topic}'
+            f'simulated lidar ready. global={self.global_cloud_topic} dynamic={self.dynamic_cloud_topic or "<none>"} '
+            f'odom={self.odom_topic} out={self.lidar_points_topic}'
         )
 
     def global_cloud_callback(self, msg: PointCloud2) -> None:
@@ -75,6 +84,17 @@ class SimulatedLidarCloud(Node):
             return
         self.global_points = np.asarray(pts, dtype=np.float32)
         self.have_global = True
+
+    def dynamic_cloud_callback(self, msg: PointCloud2) -> None:
+        pts = [
+            (float(p[0]), float(p[1]), float(p[2]))
+            for p in point_cloud2.read_points(msg, field_names=('x', 'y', 'z'), skip_nans=True)
+        ]
+        if not pts:
+            self.dynamic_points = np.empty((0, 3), dtype=np.float32)
+        else:
+            self.dynamic_points = np.asarray(pts, dtype=np.float32)
+        self.last_dynamic_wall = self.get_clock().now().nanoseconds * 1e-9
 
     def odom_callback(self, msg: Odometry) -> None:
         self.position[:] = [
@@ -96,7 +116,7 @@ class SimulatedLidarCloud(Node):
         if not self.have_global or not self.have_odom or self.global_points.size == 0:
             return
 
-        pts = self.global_points
+        pts = self.combined_points()
         rel = pts - self.position[None, :]
         ranges = np.linalg.norm(rel, axis=1)
         mask = (ranges > 0.3) & (ranges <= self.max_range)
@@ -141,6 +161,16 @@ class SimulatedLidarCloud(Node):
         _, unique_indices = np.unique(keys, axis=0, return_index=True)
         pts = pts[np.sort(unique_indices)]
         self.publish_points(pts)
+
+    def combined_points(self) -> np.ndarray:
+        if self.dynamic_points.size == 0:
+            return self.global_points
+        now = self.get_clock().now().nanoseconds * 1e-9
+        if now - self.last_dynamic_wall > self.dynamic_cloud_timeout_sec:
+            return self.global_points
+        if self.global_points.size == 0:
+            return self.dynamic_points
+        return np.vstack((self.global_points, self.dynamic_points))
 
     def publish_points(self, pts: np.ndarray) -> None:
         header = Header()
