@@ -13,6 +13,8 @@ REPORT_EVERY=20
 USE_MOCKAMAP="True"
 MIN_PROBABILITY="0.30"
 MIN_HITS="1"
+MAX_FUSED_VOXELS="0"
+FUSION_RESOLUTION="0.10"
 ADAPTIVE_ENABLE="True"
 ADAPTIVE_MIN="0.20"
 ADAPTIVE_MAX="0.35"
@@ -52,7 +54,6 @@ ADAPTIVE_MIN_GT_VOXELS="40"
 ADAPTIVE_SCORE_ALPHA="0.35"
 CLOSED_LOOP_FEEDBACK_ENABLE="True"
 CLOSED_LOOP_FEEDBACK_WEIGHT="0.05"
-CLOSED_LOOP_OPTIMIZER_ENABLE="False"
 CLOSED_LOOP_LOCAL_SCORE_WEIGHT="1.0"
 CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="0.30"
 CLOSED_LOOP_ACTION_DELAY_SEC="3.0"
@@ -72,9 +73,10 @@ ADAPTIVE_DS_CONFLICT_WEIGHT="0.004"
 ADAPTIVE_DS_UNKNOWN_REF="0.50"
 ADAPTIVE_DS_CONFLICT_REF="0.08"
 DYNAMIC_OBSTACLES_ENABLE="False"
-DYNAMIC_OBSTACLES_SPECS="0.0,1.8,0.75,0.30,1.30,0.0,1.2,9.0,0.0;5.0,-1.6,0.75,0.28,1.20,0.0,1.0,8.0,1.57;-5.5,2.2,0.75,0.26,1.10,0.8,0.7,10.0,3.14;9.0,-2.4,0.75,0.24,1.10,-0.7,0.9,11.0,0.78"
+DYNAMIC_OBSTACLES_SPECS="0.0,1.7,0.75,0.24,1.10,0.0,0.8,9.0,0.0"
 DYNAMIC_OBSTACLES_RATE="15.0"
 DYNAMIC_OBSTACLES_SPACING="0.12"
+DYNAMIC_GT_SCORE_ENABLE="False"
 INIT_X="-15.0"
 INIT_Y="0.0"
 INIT_Z="0.1"
@@ -82,6 +84,27 @@ POINT_NUM="1"
 POINT0_X="15.0"
 POINT0_Y="0.0"
 POINT0_Z="1.0"
+MAX_VEL="1.5"
+MAX_ACC="6.0"
+LOCAL_UPDATE_RANGE_X="5.5"
+LOCAL_UPDATE_RANGE_Y="5.5"
+LOCAL_UPDATE_RANGE_Z="4.5"
+LOCAL_UPDATE_RANGE_X_EXPLICIT="False"
+LOCAL_UPDATE_RANGE_Y_EXPLICIT="False"
+OBSTACLES_INFLATION="0.105"
+LAMBDA_SMOOTH="1.0"
+LAMBDA_COLLISION="0.65"
+LAMBDA_FEASIBILITY="0.1"
+MOVING_OBSTACLE_PREDICTION_ENABLE="False"
+LAMBDA_MOVING_OBSTACLE="0.80"
+MOVING_OBSTACLE_CLEARANCE="1.75"
+MOVING_OBSTACLE_TIME_HORIZON="2.5"
+MOVING_OBSTACLE_LATENCY="0.0"
+MOVING_OBSTACLE_MAX_CLEARANCE="1.75"
+MOVING_OBSTACLE_RELATIVE_VELOCITY_GAIN="0.0"
+MOVING_OBSTACLE_APPROACHING_WEIGHT="0.0"
+MOVING_OBSTACLE_TTC_ENABLE="False"
+MOVING_OBSTACLE_TTC_HORIZON="2.0"
 
 usage() {
   cat <<'EOF'
@@ -96,6 +119,8 @@ Usage: bash tools/compare_fusion.sh [options]
   --use-mockamap True|False
   --min-probability FLOAT
   --min-hits INT
+  --max-fused-voxels INT
+  --fusion-resolution FLOAT
   --adaptive-enable True|False
   --adaptive-min FLOAT
   --adaptive-max FLOAT
@@ -135,7 +160,6 @@ Usage: bash tools/compare_fusion.sh [options]
   --adaptive-score-alpha FLOAT
   --closed-loop-feedback-enable True|False
   --closed-loop-feedback-weight FLOAT
-  --closed-loop-optimizer-enable True|False
   --closed-loop-local-score-weight FLOAT
   --closed-loop-candidate-score-alpha FLOAT
   --closed-loop-action-delay-sec FLOAT
@@ -158,6 +182,7 @@ Usage: bash tools/compare_fusion.sh [options]
   --dynamic-obstacles-specs SPEC
   --dynamic-obstacles-rate FLOAT
   --dynamic-obstacles-spacing FLOAT
+  --dynamic-gt-score-enable True|False
   --init-x FLOAT
   --init-y FLOAT
   --init-z FLOAT
@@ -165,6 +190,25 @@ Usage: bash tools/compare_fusion.sh [options]
   --point0-x FLOAT
   --point0-y FLOAT
   --point0-z FLOAT
+  --max-vel FLOAT
+  --max-acc FLOAT
+  --local-update-range-x FLOAT
+  --local-update-range-y FLOAT
+  --local-update-range-z FLOAT
+  --obstacles-inflation FLOAT
+  --lambda-smooth FLOAT
+  --lambda-collision FLOAT
+  --lambda-feasibility FLOAT
+  --moving-obstacle-prediction-enable True|False
+  --lambda-moving-obstacle FLOAT
+  --moving-obstacle-clearance FLOAT
+  --moving-obstacle-time-horizon FLOAT
+  --moving-obstacle-latency FLOAT
+  --moving-obstacle-max-clearance FLOAT
+  --moving-obstacle-relative-velocity-gain FLOAT
+  --moving-obstacle-approaching-weight FLOAT
+  --moving-obstacle-ttc-enable True|False
+  --moving-obstacle-ttc-horizon FLOAT
 EOF
 }
 
@@ -179,6 +223,8 @@ while [[ $# -gt 0 ]]; do
     --use-mockamap) USE_MOCKAMAP="$2"; shift 2 ;;
     --min-probability) MIN_PROBABILITY="$2"; shift 2 ;;
     --min-hits) MIN_HITS="$2"; shift 2 ;;
+    --max-fused-voxels) MAX_FUSED_VOXELS="$2"; shift 2 ;;
+    --fusion-resolution) FUSION_RESOLUTION="$2"; shift 2 ;;
     --adaptive-enable) ADAPTIVE_ENABLE="$2"; shift 2 ;;
     --adaptive-min) ADAPTIVE_MIN="$2"; shift 2 ;;
     --adaptive-max) ADAPTIVE_MAX="$2"; shift 2 ;;
@@ -218,7 +264,6 @@ while [[ $# -gt 0 ]]; do
     --adaptive-score-alpha) ADAPTIVE_SCORE_ALPHA="$2"; shift 2 ;;
     --closed-loop-feedback-enable) CLOSED_LOOP_FEEDBACK_ENABLE="$2"; shift 2 ;;
     --closed-loop-feedback-weight) CLOSED_LOOP_FEEDBACK_WEIGHT="$2"; shift 2 ;;
-    --closed-loop-optimizer-enable) CLOSED_LOOP_OPTIMIZER_ENABLE="$2"; shift 2 ;;
     --closed-loop-local-score-weight) CLOSED_LOOP_LOCAL_SCORE_WEIGHT="$2"; shift 2 ;;
     --closed-loop-candidate-score-alpha) CLOSED_LOOP_CANDIDATE_SCORE_ALPHA="$2"; shift 2 ;;
     --closed-loop-action-delay-sec) CLOSED_LOOP_ACTION_DELAY_SEC="$2"; shift 2 ;;
@@ -241,6 +286,7 @@ while [[ $# -gt 0 ]]; do
     --dynamic-obstacles-specs) DYNAMIC_OBSTACLES_SPECS="$2"; shift 2 ;;
     --dynamic-obstacles-rate) DYNAMIC_OBSTACLES_RATE="$2"; shift 2 ;;
     --dynamic-obstacles-spacing) DYNAMIC_OBSTACLES_SPACING="$2"; shift 2 ;;
+    --dynamic-gt-score-enable) DYNAMIC_GT_SCORE_ENABLE="$2"; shift 2 ;;
     --init-x) INIT_X="$2"; shift 2 ;;
     --init-y) INIT_Y="$2"; shift 2 ;;
     --init-z) INIT_Z="$2"; shift 2 ;;
@@ -248,6 +294,25 @@ while [[ $# -gt 0 ]]; do
     --point0-x) POINT0_X="$2"; shift 2 ;;
     --point0-y) POINT0_Y="$2"; shift 2 ;;
     --point0-z) POINT0_Z="$2"; shift 2 ;;
+    --max-vel) MAX_VEL="$2"; shift 2 ;;
+    --max-acc) MAX_ACC="$2"; shift 2 ;;
+    --local-update-range-x) LOCAL_UPDATE_RANGE_X="$2"; LOCAL_UPDATE_RANGE_X_EXPLICIT="True"; shift 2 ;;
+    --local-update-range-y) LOCAL_UPDATE_RANGE_Y="$2"; LOCAL_UPDATE_RANGE_Y_EXPLICIT="True"; shift 2 ;;
+    --local-update-range-z) LOCAL_UPDATE_RANGE_Z="$2"; shift 2 ;;
+    --obstacles-inflation) OBSTACLES_INFLATION="$2"; shift 2 ;;
+    --lambda-smooth) LAMBDA_SMOOTH="$2"; shift 2 ;;
+    --lambda-collision) LAMBDA_COLLISION="$2"; shift 2 ;;
+    --lambda-feasibility) LAMBDA_FEASIBILITY="$2"; shift 2 ;;
+    --moving-obstacle-prediction-enable) MOVING_OBSTACLE_PREDICTION_ENABLE="$2"; shift 2 ;;
+    --lambda-moving-obstacle) LAMBDA_MOVING_OBSTACLE="$2"; shift 2 ;;
+    --moving-obstacle-clearance) MOVING_OBSTACLE_CLEARANCE="$2"; shift 2 ;;
+    --moving-obstacle-time-horizon) MOVING_OBSTACLE_TIME_HORIZON="$2"; shift 2 ;;
+    --moving-obstacle-latency) MOVING_OBSTACLE_LATENCY="$2"; shift 2 ;;
+    --moving-obstacle-max-clearance) MOVING_OBSTACLE_MAX_CLEARANCE="$2"; shift 2 ;;
+    --moving-obstacle-relative-velocity-gain) MOVING_OBSTACLE_RELATIVE_VELOCITY_GAIN="$2"; shift 2 ;;
+    --moving-obstacle-approaching-weight) MOVING_OBSTACLE_APPROACHING_WEIGHT="$2"; shift 2 ;;
+    --moving-obstacle-ttc-enable) MOVING_OBSTACLE_TTC_ENABLE="$2"; shift 2 ;;
+    --moving-obstacle-ttc-horizon) MOVING_OBSTACLE_TTC_HORIZON="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "unknown argument: $1" >&2
@@ -258,6 +323,18 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$OUT_DIR"
+
+if [[ "$DYNAMIC_OBSTACLES_ENABLE" =~ ^([Tt]rue|true|1|yes|YES)$ ]]; then
+  if [[ "$LOCAL_UPDATE_RANGE_X_EXPLICIT" != "True" ]]; then
+    LOCAL_UPDATE_RANGE_X="6.5"
+  fi
+  if [[ "$LOCAL_UPDATE_RANGE_Y_EXPLICIT" != "True" ]]; then
+    LOCAL_UPDATE_RANGE_Y="6.5"
+  fi
+  if [[ "$MOVING_OBSTACLE_PREDICTION_ENABLE" == "False" ]]; then
+    MOVING_OBSTACLE_PREDICTION_ENABLE="True"
+  fi
+fi
 
 CSV_PATH="$OUT_DIR/${LABEL}.csv"
 SUMMARY_PATH="$OUT_DIR/${LABEL}.summary.json"
@@ -345,6 +422,26 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   point0_x:="$POINT0_X" \
   point0_y:="$POINT0_Y" \
   point0_z:="$POINT0_Z" \
+  fusion_resolution:="$FUSION_RESOLUTION" \
+  max_vel:="$MAX_VEL" \
+  max_acc:="$MAX_ACC" \
+  local_update_range_x:="$LOCAL_UPDATE_RANGE_X" \
+  local_update_range_y:="$LOCAL_UPDATE_RANGE_Y" \
+  local_update_range_z:="$LOCAL_UPDATE_RANGE_Z" \
+  obstacles_inflation:="$OBSTACLES_INFLATION" \
+  lambda_smooth:="$LAMBDA_SMOOTH" \
+  lambda_collision:="$LAMBDA_COLLISION" \
+  lambda_feasibility:="$LAMBDA_FEASIBILITY" \
+  moving_obstacle_prediction_enable:="$MOVING_OBSTACLE_PREDICTION_ENABLE" \
+  lambda_moving_obstacle:="$LAMBDA_MOVING_OBSTACLE" \
+  moving_obstacle_clearance:="$MOVING_OBSTACLE_CLEARANCE" \
+  moving_obstacle_time_horizon:="$MOVING_OBSTACLE_TIME_HORIZON" \
+  moving_obstacle_latency:="$MOVING_OBSTACLE_LATENCY" \
+  moving_obstacle_max_clearance:="$MOVING_OBSTACLE_MAX_CLEARANCE" \
+  moving_obstacle_relative_velocity_gain:="$MOVING_OBSTACLE_RELATIVE_VELOCITY_GAIN" \
+  moving_obstacle_approaching_weight:="$MOVING_OBSTACLE_APPROACHING_WEIGHT" \
+  moving_obstacle_ttc_enable:="$MOVING_OBSTACLE_TTC_ENABLE" \
+  moving_obstacle_ttc_horizon:="$MOVING_OBSTACLE_TTC_HORIZON" \
   near_field_radius:="$NEAR_FIELD_RADIUS" \
   adaptive_near_field_radius_enable:="$ADAPTIVE_NEAR_FIELD_RADIUS_ENABLE" \
   adaptive_near_field_radius_min:="$ADAPTIVE_NEAR_FIELD_RADIUS_MIN" \
@@ -363,6 +460,7 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   adaptive_z_max_step:="$ADAPTIVE_Z_MAX_STEP" \
   min_probability:="$MIN_PROBABILITY" \
   min_hits:="$MIN_HITS" \
+  max_fused_voxels:="$MAX_FUSED_VOXELS" \
   adaptive_min_probability_enable:="$ADAPTIVE_ENABLE" \
   adaptive_min_probability_min:="$ADAPTIVE_MIN" \
   adaptive_min_probability_max:="$ADAPTIVE_MAX" \
@@ -386,7 +484,7 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   adaptive_score_alpha:="$ADAPTIVE_SCORE_ALPHA" \
   closed_loop_feedback_enable:="$CLOSED_LOOP_FEEDBACK_ENABLE" \
   closed_loop_feedback_weight:="$CLOSED_LOOP_FEEDBACK_WEIGHT" \
-  closed_loop_optimizer_enable:="$CLOSED_LOOP_OPTIMIZER_ENABLE" \
+  closed_loop_optimizer_enable:="False" \
   closed_loop_local_score_weight:="$CLOSED_LOOP_LOCAL_SCORE_WEIGHT" \
   closed_loop_candidate_score_alpha:="$CLOSED_LOOP_CANDIDATE_SCORE_ALPHA" \
   closed_loop_action_delay_sec:="$CLOSED_LOOP_ACTION_DELAY_SEC" \
@@ -409,6 +507,7 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   dynamic_obstacles_specs:="$DYNAMIC_OBSTACLES_SPECS" \
   dynamic_obstacles_rate:="$DYNAMIC_OBSTACLES_RATE" \
   dynamic_obstacles_spacing:="$DYNAMIC_OBSTACLES_SPACING" \
+  dynamic_gt_score_enable:="$DYNAMIC_GT_SCORE_ENABLE" \
   >"$LAUNCH_LOG" 2>&1 &
 LAUNCH_PID=$!
 

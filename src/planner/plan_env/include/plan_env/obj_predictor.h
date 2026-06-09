@@ -104,6 +104,13 @@ namespace fast_planner
 
       return pt;
     }
+
+    Eigen::Vector3d evaluateConstVelVelocity()
+    {
+      Eigen::Vector3d vel;
+      vel(0) = polys[0](1), vel(1) = polys[1](1), vel(2) = polys[2](1);
+      return vel;
+    }
   };
 
   /* ========== subscribe and record object history ========== */
@@ -149,6 +156,7 @@ namespace fast_planner
     int obj_num_;
     double lambda_;
     double predict_rate_;
+    rclcpp::Node::SharedPtr host_node_;
 
     vector<rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> pose_subs_;
     rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr marker_sub_;
@@ -173,6 +181,7 @@ namespace fast_planner
     ~ObjPredictor() {}
 
     void init();
+    void init(rclcpp::Node::SharedPtr node);
 
     ObjPrediction getPredictionTraj();
     ObjScale getObjScale();
@@ -180,6 +189,7 @@ namespace fast_planner
 
     Eigen::Vector3d evaluatePoly(int obs_id, double time);
     Eigen::Vector3d evaluateConstVel(int obs_id, double time);
+    Eigen::Vector3d evaluateConstVelVelocity(int obs_id);
 
     typedef std::shared_ptr<ObjPredictor> Ptr;
   };

@@ -20,6 +20,11 @@ namespace ego_planner
     node_->declare_parameter("fsm/planning_horizon", -1.0);
     node_->declare_parameter("fsm/planning_horizen_time", -1.0);
     node_->declare_parameter("fsm/emergency_time", 1.0);
+    node_->declare_parameter("fsm/moving_obstacle_ttc_enable", false);
+    node_->declare_parameter("fsm/moving_obstacle_ttc_horizon", 2.0);
+    node_->declare_parameter("fsm/moving_obstacle_ttc_clearance", 1.2);
+    node_->declare_parameter("fsm/moving_obstacle_ttc_latency", 0.35);
+    node_->declare_parameter("fsm/moving_obstacle_ttc_max_clearance", 2.5);
     node_->declare_parameter("fsm/realworld_experiment", false);
     node_->declare_parameter("fsm/fail_safe", true);
 
@@ -29,6 +34,11 @@ namespace ego_planner
     node_->get_parameter("fsm/planning_horizon", planning_horizen_);
     node_->get_parameter("fsm/planning_horizen_time", planning_horizen_time_);
     node_->get_parameter("fsm/emergency_time", emergency_time_);
+    node_->get_parameter("fsm/moving_obstacle_ttc_enable", moving_obstacle_ttc_enable_);
+    node_->get_parameter("fsm/moving_obstacle_ttc_horizon", moving_obstacle_ttc_horizon_);
+    node_->get_parameter("fsm/moving_obstacle_ttc_clearance", moving_obstacle_ttc_clearance_);
+    node_->get_parameter("fsm/moving_obstacle_ttc_latency", moving_obstacle_ttc_latency_);
+    node_->get_parameter("fsm/moving_obstacle_ttc_max_clearance", moving_obstacle_ttc_max_clearance_);
     node_->get_parameter("fsm/realworld_experiment", flag_realworld_experiment_);
     node_->get_parameter("fsm/fail_safe", enable_fail_safe_);
 
@@ -735,10 +745,44 @@ namespace ego_planner
       if (t_cur < t_2_3 && t >= t_2_3) // If t_cur < t_2_3, only the first 2/3 partition of the trajectory is considered valid and will get checked.
         break;
 
-      bool occ = false;
-      occ |= map->getInflateOccupancy(info->position_traj_.evaluateDeBoorT(t));
+	      bool occ = false;
+	      occ |= map->getInflateOccupancy(info->position_traj_.evaluateDeBoorT(t));
 
-      for (size_t id = 0; id < planner_manager_->swarm_trajs_buf_.size(); id++)
+      if (!occ && moving_obstacle_ttc_enable_ && planner_manager_->obj_predictor_ != nullptr &&
+          (t - t_cur) <= moving_obstacle_ttc_horizon_)
+      {
+        Eigen::Vector3d traj_pos = info->position_traj_.evaluateDeBoorT(t);
+        Eigen::Vector3d traj_vel = info->velocity_traj_.evaluateDeBoorT(t);
+        double t_pred_global = t_cur_global + (t - t_cur);
+        double base_clearance = std::max(0.05, moving_obstacle_ttc_clearance_);
+        double max_clearance = std::max(base_clearance, moving_obstacle_ttc_max_clearance_);
+        double latency = std::max(0.0, moving_obstacle_ttc_latency_);
+
+        for (int obj_id = 0; obj_id < planner_manager_->obj_predictor_->getObjNums(); ++obj_id)
+        {
+          Eigen::Vector3d obj_pos = planner_manager_->obj_predictor_->evaluateConstVel(obj_id, t_pred_global);
+          Eigen::Vector3d obj_vel = planner_manager_->obj_predictor_->evaluateConstVelVelocity(obj_id);
+          if (!std::isfinite(obj_pos(0)) || !std::isfinite(obj_pos(1)) || !std::isfinite(obj_pos(2)))
+          {
+            continue;
+          }
+          if (!std::isfinite(obj_vel(0)) || !std::isfinite(obj_vel(1)) || !std::isfinite(obj_vel(2)))
+          {
+            obj_vel.setZero();
+          }
+
+          double rel_speed = (traj_vel - obj_vel).norm();
+          double clearance = base_clearance + rel_speed * latency + 0.5 * planner_manager_->pp_.max_acc_ * latency * latency;
+          clearance = std::min(max_clearance, std::max(base_clearance, clearance));
+          if ((traj_pos - obj_pos).norm() < clearance)
+          {
+            occ = true;
+            break;
+          }
+        }
+      }
+
+	      for (size_t id = 0; id < planner_manager_->swarm_trajs_buf_.size(); id++)
       {
         if ((planner_manager_->swarm_trajs_buf_.at(id).drone_id != (int)id) || (planner_manager_->swarm_trajs_buf_.at(id).drone_id == planner_manager_->pp_.drone_id))
         {

@@ -23,6 +23,23 @@ def generate_launch_description():
     max_vel = LaunchConfiguration('max_vel', default=2.0)
     max_acc = LaunchConfiguration('max_acc', default=3.0)
     planning_horizon = LaunchConfiguration('planning_horizon', default=7.5)
+    local_update_range_x = LaunchConfiguration('local_update_range_x', default=5.5)
+    local_update_range_y = LaunchConfiguration('local_update_range_y', default=5.5)
+    local_update_range_z = LaunchConfiguration('local_update_range_z', default=4.5)
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation', default=0.105)
+    lambda_smooth = LaunchConfiguration('lambda_smooth', default=1.0)
+    lambda_collision = LaunchConfiguration('lambda_collision', default=0.65)
+    lambda_feasibility = LaunchConfiguration('lambda_feasibility', default=0.1)
+    moving_obstacle_prediction_enable = LaunchConfiguration('moving_obstacle_prediction_enable', default=False)
+    lambda_moving_obstacle = LaunchConfiguration('lambda_moving_obstacle', default=0.80)
+    moving_obstacle_clearance = LaunchConfiguration('moving_obstacle_clearance', default=1.75)
+    moving_obstacle_time_horizon = LaunchConfiguration('moving_obstacle_time_horizon', default=2.5)
+    moving_obstacle_latency = LaunchConfiguration('moving_obstacle_latency', default=0.0)
+    moving_obstacle_max_clearance = LaunchConfiguration('moving_obstacle_max_clearance', default=1.75)
+    moving_obstacle_relative_velocity_gain = LaunchConfiguration('moving_obstacle_relative_velocity_gain', default=0.0)
+    moving_obstacle_approaching_weight = LaunchConfiguration('moving_obstacle_approaching_weight', default=0.0)
+    moving_obstacle_ttc_enable = LaunchConfiguration('moving_obstacle_ttc_enable', default=False)
+    moving_obstacle_ttc_horizon = LaunchConfiguration('moving_obstacle_ttc_horizon', default=2.0)
     
     point_num = LaunchConfiguration('point_num', default=1)
     point0_x = LaunchConfiguration('point0_x', default=0.0)
@@ -63,6 +80,63 @@ def generate_launch_description():
     max_vel_arg = DeclareLaunchArgument('max_vel', default_value=max_vel, description='Maximum velocity')
     max_acc_arg = DeclareLaunchArgument('max_acc', default_value=max_acc, description='Maximum acceleration')
     planning_horizon_arg = DeclareLaunchArgument('planning_horizon', default_value=planning_horizon, description='Planning horizon')
+    local_update_range_x_arg = DeclareLaunchArgument('local_update_range_x', default_value=local_update_range_x, description='Local map update range X')
+    local_update_range_y_arg = DeclareLaunchArgument('local_update_range_y', default_value=local_update_range_y, description='Local map update range Y')
+    local_update_range_z_arg = DeclareLaunchArgument('local_update_range_z', default_value=local_update_range_z, description='Local map update range Z')
+    obstacles_inflation_arg = DeclareLaunchArgument('obstacles_inflation', default_value=obstacles_inflation, description='Obstacle inflation radius')
+    lambda_smooth_arg = DeclareLaunchArgument('lambda_smooth', default_value=lambda_smooth, description='B-spline smoothness weight')
+    lambda_collision_arg = DeclareLaunchArgument('lambda_collision', default_value=lambda_collision, description='B-spline collision weight')
+    lambda_feasibility_arg = DeclareLaunchArgument('lambda_feasibility', default_value=lambda_feasibility, description='B-spline feasibility weight')
+    moving_obstacle_prediction_enable_arg = DeclareLaunchArgument(
+        'moving_obstacle_prediction_enable',
+        default_value=moving_obstacle_prediction_enable,
+        description='Enable moving obstacle prediction and time-aware avoidance cost'
+    )
+    lambda_moving_obstacle_arg = DeclareLaunchArgument(
+        'lambda_moving_obstacle',
+        default_value=lambda_moving_obstacle,
+        description='B-spline moving obstacle avoidance weight'
+    )
+    moving_obstacle_clearance_arg = DeclareLaunchArgument(
+        'moving_obstacle_clearance',
+        default_value=moving_obstacle_clearance,
+        description='Moving obstacle clearance radius'
+    )
+    moving_obstacle_time_horizon_arg = DeclareLaunchArgument(
+        'moving_obstacle_time_horizon',
+        default_value=moving_obstacle_time_horizon,
+        description='Moving obstacle prediction horizon used by optimizer'
+    )
+    moving_obstacle_latency_arg = DeclareLaunchArgument(
+        'moving_obstacle_latency',
+        default_value=moving_obstacle_latency,
+        description='Latency margin used by moving obstacle adaptive clearance'
+    )
+    moving_obstacle_max_clearance_arg = DeclareLaunchArgument(
+        'moving_obstacle_max_clearance',
+        default_value=moving_obstacle_max_clearance,
+        description='Upper bound for adaptive moving obstacle clearance'
+    )
+    moving_obstacle_relative_velocity_gain_arg = DeclareLaunchArgument(
+        'moving_obstacle_relative_velocity_gain',
+        default_value=moving_obstacle_relative_velocity_gain,
+        description='Relative velocity gain for adaptive moving obstacle clearance'
+    )
+    moving_obstacle_approaching_weight_arg = DeclareLaunchArgument(
+        'moving_obstacle_approaching_weight',
+        default_value=moving_obstacle_approaching_weight,
+        description='Extra penalty scale for approaching dynamic obstacles'
+    )
+    moving_obstacle_ttc_enable_arg = DeclareLaunchArgument(
+        'moving_obstacle_ttc_enable',
+        default_value=moving_obstacle_ttc_enable,
+        description='Enable moving obstacle TTC trigger in safety checker'
+    )
+    moving_obstacle_ttc_horizon_arg = DeclareLaunchArgument(
+        'moving_obstacle_ttc_horizon',
+        default_value=moving_obstacle_ttc_horizon,
+        description='Moving obstacle TTC trigger horizon'
+    )
     
     point_num_arg = DeclareLaunchArgument('point_num', default_value=point_num, description='Number of waypoints')
     point0_x_arg = DeclareLaunchArgument('point0_x', default_value=point0_x, description='Waypoint 0 X coordinate')
@@ -118,6 +192,11 @@ def generate_launch_description():
             {'fsm/planning_horizon': planning_horizon},
             {'fsm/planning_horizen_time': 3.0},
             {'fsm/emergency_time': 1.0},
+            {'fsm/moving_obstacle_ttc_enable': moving_obstacle_ttc_enable},
+            {'fsm/moving_obstacle_ttc_horizon': moving_obstacle_ttc_horizon},
+            {'fsm/moving_obstacle_ttc_clearance': moving_obstacle_clearance},
+            {'fsm/moving_obstacle_ttc_latency': moving_obstacle_latency},
+            {'fsm/moving_obstacle_ttc_max_clearance': moving_obstacle_max_clearance},
             {'fsm/realworld_experiment': False},
             {'fsm/fail_safe': True},
             
@@ -142,10 +221,10 @@ def generate_launch_description():
             {'grid_map/map_size_x': map_size_x},
             {'grid_map/map_size_y': map_size_y},
             {'grid_map/map_size_z': map_size_z},
-            {'grid_map/local_update_range_x': 5.5},
-            {'grid_map/local_update_range_y': 5.5},
-            {'grid_map/local_update_range_z': 4.5},
-            {'grid_map/obstacles_inflation': 0.099},
+            {'grid_map/local_update_range_x': local_update_range_x},
+            {'grid_map/local_update_range_y': local_update_range_y},
+            {'grid_map/local_update_range_z': local_update_range_z},
+            {'grid_map/obstacles_inflation': obstacles_inflation},
             {'grid_map/self_clearance_xy': 0.35},
             {'grid_map/self_clearance_z': 0.25},
             {'grid_map/local_map_margin': 10},
@@ -187,12 +266,20 @@ def generate_launch_description():
             {'manager/use_distinctive_trajs': use_distinctive_trajs},
             {'manager/drone_id': drone_id},
             # Trajectory optimization parameters
-            {'optimization/lambda_smooth': 1.0},
-            {'optimization/lambda_collision': 0.5},
-            {'optimization/lambda_feasibility': 0.1},
+            {'optimization/lambda_smooth': lambda_smooth},
+            {'optimization/lambda_collision': lambda_collision},
+            {'optimization/lambda_feasibility': lambda_feasibility},
             {'optimization/lambda_fitness': 1.0},
+            {'optimization/lambda_moving_obstacle': lambda_moving_obstacle},
             {'optimization/dist0': 0.5},
             {'optimization/swarm_clearance': 0.5},
+            {'optimization/moving_obstacle_enable': moving_obstacle_prediction_enable},
+            {'optimization/moving_obstacle_clearance': moving_obstacle_clearance},
+            {'optimization/moving_obstacle_time_horizon': moving_obstacle_time_horizon},
+            {'optimization/moving_obstacle_latency': moving_obstacle_latency},
+            {'optimization/moving_obstacle_max_clearance': moving_obstacle_max_clearance},
+            {'optimization/moving_obstacle_relative_velocity_gain': moving_obstacle_relative_velocity_gain},
+            {'optimization/moving_obstacle_approaching_weight': moving_obstacle_approaching_weight},
             {'optimization/max_vel': max_vel},
             {'optimization/max_acc': max_acc},
 
@@ -202,6 +289,7 @@ def generate_launch_description():
             {'bspline/limit_ratio': 1.1},
 
             # Object prediction parameters
+            {'prediction/enable': moving_obstacle_prediction_enable},
             {'prediction/obj_num': obj_num_set},
             {'prediction/lambda': 1.0},
             {'prediction/predict_rate': 1.0}
@@ -226,6 +314,23 @@ def generate_launch_description():
     ld.add_action(max_vel_arg)
     ld.add_action(max_acc_arg)
     ld.add_action(planning_horizon_arg)
+    ld.add_action(local_update_range_x_arg)
+    ld.add_action(local_update_range_y_arg)
+    ld.add_action(local_update_range_z_arg)
+    ld.add_action(obstacles_inflation_arg)
+    ld.add_action(lambda_smooth_arg)
+    ld.add_action(lambda_collision_arg)
+    ld.add_action(lambda_feasibility_arg)
+    ld.add_action(moving_obstacle_prediction_enable_arg)
+    ld.add_action(lambda_moving_obstacle_arg)
+    ld.add_action(moving_obstacle_clearance_arg)
+    ld.add_action(moving_obstacle_time_horizon_arg)
+    ld.add_action(moving_obstacle_latency_arg)
+    ld.add_action(moving_obstacle_max_clearance_arg)
+    ld.add_action(moving_obstacle_relative_velocity_gain_arg)
+    ld.add_action(moving_obstacle_approaching_weight_arg)
+    ld.add_action(moving_obstacle_ttc_enable_arg)
+    ld.add_action(moving_obstacle_ttc_horizon_arg)
     
     ld.add_action(point_num_arg)
     ld.add_action(point0_x_arg)

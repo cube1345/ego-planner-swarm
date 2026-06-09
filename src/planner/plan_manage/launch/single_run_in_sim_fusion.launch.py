@@ -8,10 +8,7 @@ from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
 DEFAULT_DYNAMIC_OBSTACLE_SPECS = (
-    '0.0,1.8,0.75,0.30,1.30,0.0,1.2,9.0,0.0;'
-    '5.0,-1.6,0.75,0.28,1.20,0.0,1.0,8.0,1.57;'
-    '-5.5,2.2,0.75,0.26,1.10,0.8,0.7,10.0,3.14;'
-    '9.0,-2.4,0.75,0.24,1.10,-0.7,0.9,11.0,0.78'
+    '0.0,1.7,0.75,0.24,1.10,0.0,0.8,9.0,0.0'
 )
 
 
@@ -34,6 +31,7 @@ def launch_setup(context, *args, **kwargs):
     fusion_python_executable = LaunchConfiguration('fusion_python_executable').perform(context)
     use_fusion = LaunchConfiguration('use_fusion')
     use_fusion_value = LaunchConfiguration('use_fusion').perform(context).lower() in ('1', 'true', 'yes')
+    fusion_resolution = LaunchConfiguration('fusion_resolution').perform(context)
     adaptive_min_probability_enable = LaunchConfiguration('adaptive_min_probability_enable').perform(context)
     min_probability = LaunchConfiguration('min_probability').perform(context)
     min_hits = LaunchConfiguration('min_hits').perform(context)
@@ -41,6 +39,7 @@ def launch_setup(context, *args, **kwargs):
     adaptive_min_probability_max = LaunchConfiguration('adaptive_min_probability_max').perform(context)
     adaptive_min_probability_step = LaunchConfiguration('adaptive_min_probability_step').perform(context)
     adaptive_min_hits_enable = LaunchConfiguration('adaptive_min_hits_enable').perform(context)
+    max_fused_voxels = LaunchConfiguration('max_fused_voxels').perform(context)
     near_field_radius = LaunchConfiguration('near_field_radius').perform(context)
     adaptive_near_field_radius_enable = LaunchConfiguration('adaptive_near_field_radius_enable').perform(context)
     adaptive_near_field_radius_min = LaunchConfiguration('adaptive_near_field_radius_min').perform(context)
@@ -100,6 +99,26 @@ def launch_setup(context, *args, **kwargs):
     dynamic_obstacles_specs = LaunchConfiguration('dynamic_obstacles_specs').perform(context)
     dynamic_obstacles_rate = LaunchConfiguration('dynamic_obstacles_rate').perform(context)
     dynamic_obstacles_spacing = LaunchConfiguration('dynamic_obstacles_spacing').perform(context)
+    dynamic_gt_score_enable = LaunchConfiguration('dynamic_gt_score_enable').perform(context)
+    max_vel = LaunchConfiguration('max_vel').perform(context)
+    max_acc = LaunchConfiguration('max_acc').perform(context)
+    local_update_range_x = LaunchConfiguration('local_update_range_x').perform(context)
+    local_update_range_y = LaunchConfiguration('local_update_range_y').perform(context)
+    local_update_range_z = LaunchConfiguration('local_update_range_z').perform(context)
+    obstacles_inflation = LaunchConfiguration('obstacles_inflation').perform(context)
+    lambda_smooth = LaunchConfiguration('lambda_smooth').perform(context)
+    lambda_collision = LaunchConfiguration('lambda_collision').perform(context)
+    lambda_feasibility = LaunchConfiguration('lambda_feasibility').perform(context)
+    moving_obstacle_prediction_enable = LaunchConfiguration('moving_obstacle_prediction_enable').perform(context)
+    lambda_moving_obstacle = LaunchConfiguration('lambda_moving_obstacle').perform(context)
+    moving_obstacle_clearance = LaunchConfiguration('moving_obstacle_clearance').perform(context)
+    moving_obstacle_time_horizon = LaunchConfiguration('moving_obstacle_time_horizon').perform(context)
+    moving_obstacle_latency = LaunchConfiguration('moving_obstacle_latency').perform(context)
+    moving_obstacle_max_clearance = LaunchConfiguration('moving_obstacle_max_clearance').perform(context)
+    moving_obstacle_relative_velocity_gain = LaunchConfiguration('moving_obstacle_relative_velocity_gain').perform(context)
+    moving_obstacle_approaching_weight = LaunchConfiguration('moving_obstacle_approaching_weight').perform(context)
+    moving_obstacle_ttc_enable = LaunchConfiguration('moving_obstacle_ttc_enable').perform(context)
+    moving_obstacle_ttc_horizon = LaunchConfiguration('moving_obstacle_ttc_horizon').perform(context)
 
     pkg_share = get_package_share_directory('ego_planner')
     pkg_prefix = get_package_prefix('ego_planner')
@@ -178,9 +197,26 @@ def launch_setup(context, *args, **kwargs):
             'cy': str(243.44969177246094),
             'fx': str(387.229248046875),
             'fy': str(387.229248046875),
-            'max_vel': str(2.0),
-            'max_acc': str(6.0),
+            'max_vel': max_vel,
+            'max_acc': max_acc,
             'planning_horizon': str(7.5),
+            'local_update_range_x': local_update_range_x,
+            'local_update_range_y': local_update_range_y,
+            'local_update_range_z': local_update_range_z,
+            'obstacles_inflation': obstacles_inflation,
+            'lambda_smooth': lambda_smooth,
+            'lambda_collision': lambda_collision,
+            'lambda_feasibility': lambda_feasibility,
+            'moving_obstacle_prediction_enable': moving_obstacle_prediction_enable,
+            'lambda_moving_obstacle': lambda_moving_obstacle,
+            'moving_obstacle_clearance': moving_obstacle_clearance,
+            'moving_obstacle_time_horizon': moving_obstacle_time_horizon,
+            'moving_obstacle_latency': moving_obstacle_latency,
+            'moving_obstacle_max_clearance': moving_obstacle_max_clearance,
+            'moving_obstacle_relative_velocity_gain': moving_obstacle_relative_velocity_gain,
+            'moving_obstacle_approaching_weight': moving_obstacle_approaching_weight,
+            'moving_obstacle_ttc_enable': moving_obstacle_ttc_enable,
+            'moving_obstacle_ttc_horizon': moving_obstacle_ttc_horizon,
             'use_distinctive_trajs': 'True',
             'flight_type': str(2),
             'point_num': point_num,
@@ -279,9 +315,13 @@ def launch_setup(context, *args, **kwargs):
             '--ros-args',
             '-p', f'depth_cloud_topic:=/drone_{drone_id}_pcl_render_node/cloud',
             '-p', f'lidar_cloud_topic:={lidar_topic_full}',
+            '-p', f'dynamic_cloud_topic:={dynamic_obstacles_topic}',
+            '-p', 'dynamic_cloud_timeout_sec:=0.6',
+            '-p', f'dynamic_gt_score_enable:={dynamic_gt_score_enable}',
             '-p', f'odom_topic:={odom_topic_full}',
             '-p', f'output_topic:={fused_topic_full}',
             '-p', 'output_frame:=world',
+            '-p', f'resolution:={fusion_resolution}',
             '-p', 'publish_debug_stats_every:=20',
             '-p', f'near_field_radius:={near_field_radius}',
             '-p', f'adaptive_near_field_radius_enable:={adaptive_near_field_radius_enable}',
@@ -302,6 +342,7 @@ def launch_setup(context, *args, **kwargs):
             '-p', 'max_range:=10.0',
             '-p', f'min_probability:={min_probability}',
             '-p', f'min_hits:={min_hits}',
+            '-p', f'max_fused_voxels:={max_fused_voxels}',
             '-p', f'adaptive_min_probability_enable:={adaptive_min_probability_enable}',
             '-p', f'adaptive_min_probability_min:={adaptive_min_probability_min}',
             '-p', f'adaptive_min_probability_max:={adaptive_min_probability_max}',
@@ -398,6 +439,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_dynamic', default_value='False'),
         DeclareLaunchArgument('fusion_python_executable', default_value='/usr/bin/python3'),
         DeclareLaunchArgument('use_fusion', default_value='True'),
+        DeclareLaunchArgument('fusion_resolution', default_value='0.10'),
         DeclareLaunchArgument('near_field_radius', default_value='4.0'),
         DeclareLaunchArgument('adaptive_near_field_radius_enable', default_value='False'),
         DeclareLaunchArgument('adaptive_near_field_radius_min', default_value='3.0'),
@@ -416,6 +458,7 @@ def generate_launch_description():
         DeclareLaunchArgument('adaptive_z_max_step', default_value='0.25'),
         DeclareLaunchArgument('min_probability', default_value='0.30'),
         DeclareLaunchArgument('min_hits', default_value='1'),
+        DeclareLaunchArgument('max_fused_voxels', default_value='0'),
         DeclareLaunchArgument('adaptive_min_probability_enable', default_value='True'),
         DeclareLaunchArgument('adaptive_min_probability_min', default_value='0.20'),
         DeclareLaunchArgument('adaptive_min_probability_max', default_value='0.35'),
@@ -465,5 +508,25 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument('dynamic_obstacles_rate', default_value='15.0'),
         DeclareLaunchArgument('dynamic_obstacles_spacing', default_value='0.12'),
+        DeclareLaunchArgument('dynamic_gt_score_enable', default_value='False'),
+        DeclareLaunchArgument('max_vel', default_value='1.5'),
+        DeclareLaunchArgument('max_acc', default_value='6.0'),
+        DeclareLaunchArgument('local_update_range_x', default_value='5.5'),
+        DeclareLaunchArgument('local_update_range_y', default_value='5.5'),
+        DeclareLaunchArgument('local_update_range_z', default_value='4.5'),
+        DeclareLaunchArgument('obstacles_inflation', default_value='0.105'),
+        DeclareLaunchArgument('lambda_smooth', default_value='1.0'),
+        DeclareLaunchArgument('lambda_collision', default_value='0.65'),
+        DeclareLaunchArgument('lambda_feasibility', default_value='0.1'),
+        DeclareLaunchArgument('moving_obstacle_prediction_enable', default_value='False'),
+        DeclareLaunchArgument('lambda_moving_obstacle', default_value='0.80'),
+        DeclareLaunchArgument('moving_obstacle_clearance', default_value='1.75'),
+        DeclareLaunchArgument('moving_obstacle_time_horizon', default_value='2.5'),
+        DeclareLaunchArgument('moving_obstacle_latency', default_value='0.0'),
+        DeclareLaunchArgument('moving_obstacle_max_clearance', default_value='1.75'),
+        DeclareLaunchArgument('moving_obstacle_relative_velocity_gain', default_value='0.0'),
+        DeclareLaunchArgument('moving_obstacle_approaching_weight', default_value='0.0'),
+        DeclareLaunchArgument('moving_obstacle_ttc_enable', default_value='False'),
+        DeclareLaunchArgument('moving_obstacle_ttc_horizon', default_value='2.0'),
         OpaqueFunction(function=launch_setup),
     ])

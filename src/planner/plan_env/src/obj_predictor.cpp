@@ -50,7 +50,7 @@ namespace fast_planner
 
     Eigen::Vector4d pos_t;
     pos_t(0) = msg->pose.position.x, pos_t(1) = msg->pose.position.y, pos_t(2) = msg->pose.position.z;
-    pos_t(3) = (rclcpp::Clock().now() - global_start_time_).seconds();
+    pos_t(3) = rclcpp::Clock(RCL_SYSTEM_TIME).now().seconds() - global_start_time_.seconds();
 
     history_.push_back(pos_t);
     // cout << "idx: " << obj_idx_ << "pos_t: " << pos_t.transpose() << endl;
@@ -67,21 +67,27 @@ namespace fast_planner
 
   void ObjPredictor::init()
   {
+    init(shared_from_this());
+  }
+
+  void ObjPredictor::init(rclcpp::Node::SharedPtr node)
+  {
+    host_node_ = node;
+
     /* get param */
     int queue_size, skip_nums;
 
-    this->declare_parameter("prediction/obj_num", 0);
-    this->declare_parameter("prediction/lambda", 1.0);
-    this->declare_parameter("prediction/predict_rate", 1.0);
-    this->declare_parameter("prediction/queue_size", 10);
-    this->declare_parameter("prediction/skip_nums", 1);
+    host_node_->declare_parameter("prediction/obj_num", 0);
+    host_node_->declare_parameter("prediction/lambda", 1.0);
+    host_node_->declare_parameter("prediction/predict_rate", 1.0);
+    host_node_->declare_parameter("prediction/queue_size", 10);
+    host_node_->declare_parameter("prediction/skip_nums", 1);
 
-    
-    this->get_parameter("prediction/obj_num", obj_num_);
-    this->get_parameter("prediction/lambda", lambda_);
-    this->get_parameter("prediction/predict_rate", predict_rate_);
-    this->get_parameter("prediction/queue_size", queue_size);
-    this->get_parameter("prediction/skip_nums", skip_nums);
+    host_node_->get_parameter("prediction/obj_num", obj_num_);
+    host_node_->get_parameter("prediction/lambda", lambda_);
+    host_node_->get_parameter("prediction/predict_rate", predict_rate_);
+    host_node_->get_parameter("prediction/queue_size", queue_size);
+    host_node_->get_parameter("prediction/skip_nums", skip_nums);
 
     predict_trajs_.reset(new vector<PolynomialPrediction>);
     predict_trajs_->resize(obj_num_);
@@ -93,7 +99,7 @@ namespace fast_planner
       scale_init_[i] = false;
 
     /* subscribe to pose */
-    rclcpp::Time t_now = this->now();
+    rclcpp::Time t_now = host_node_->now();
     for (int i = 0; i < obj_num_; i++)
     {
       shared_ptr<ObjHistory> obj_his(new ObjHistory);
@@ -101,7 +107,7 @@ namespace fast_planner
       obj_his->init(i, skip_nums, queue_size, t_now);
       obj_histories_.push_back(obj_his);
 
-      auto pose_sub = this->create_subscription<geometry_msgs::msg::PoseStamped>(
+      auto pose_sub = host_node_->create_subscription<geometry_msgs::msg::PoseStamped>(
           "/dynamic/pose_" + std::to_string(i), 10,
           std::bind(&ObjHistory::poseCallback, obj_his.get(), std::placeholders::_1));
 
@@ -110,13 +116,15 @@ namespace fast_planner
       predict_trajs_->at(i).setGlobalStartTime(t_now);
     }
 
-    marker_sub_ = this->create_subscription<visualization_msgs::msg::Marker>(
+    marker_sub_ = host_node_->create_subscription<visualization_msgs::msg::Marker>(
         "/dynamic/obj", 10, std::bind(&ObjPredictor::markerCallback, this, std::placeholders::_1));
 
     /* update prediction */
-    predict_timer_ = this->create_wall_timer(
+    predict_timer_ = host_node_->create_wall_timer(
         std::chrono::duration<double>(1.0 / predict_rate_),
         std::bind(&ObjPredictor::predictCallback, this));
+
+    RCLCPP_INFO(host_node_->get_logger(), "moving object predictor ready. obj_num=%d rate=%.2f", obj_num_, predict_rate_);
   }
 
   ObjPrediction ObjPredictor::getPredictionTraj()
@@ -203,6 +211,8 @@ namespace fast_planner
   void ObjPredictor::markerCallback(const visualization_msgs::msg::Marker::ConstPtr &msg)
   {
     int idx = msg->id;
+    if (idx < 0 || idx >= obj_num_)
+      return;
     (*obj_scale_)[idx](0) = msg->scale.x;
     (*obj_scale_)[idx](1) = msg->scale.y;
     (*obj_scale_)[idx](2) = msg->scale.z;
@@ -230,6 +240,8 @@ namespace fast_planner
       /* ---------- get the last two point ---------- */
       list<Eigen::Vector4d> his;
       obj_histories_[i]->getHistory(his);
+      if (his.size() < 2)
+        continue;
       // if ( i==0 )
       // {
       //   cout << "his.size()=" << his.size() << endl;
@@ -285,7 +297,7 @@ namespace fast_planner
 
   Eigen::Vector3d ObjPredictor::evaluatePoly(int obj_id, double time)
   {
-    if (obj_id < obj_num_)
+    if (obj_id < obj_num_ && predict_trajs_->at(obj_id).valid())
     {
       return predict_trajs_->at(obj_id).evaluate(time);
     }
@@ -296,9 +308,20 @@ namespace fast_planner
 
   Eigen::Vector3d ObjPredictor::evaluateConstVel(int obj_id, double time)
   {
-    if (obj_id < obj_num_)
+    if (obj_id < obj_num_ && predict_trajs_->at(obj_id).valid())
     {
       return predict_trajs_->at(obj_id).evaluateConstVel(time);
+    }
+
+    double MAX = std::numeric_limits<double>::max();
+    return Eigen::Vector3d(MAX, MAX, MAX);
+  }
+
+  Eigen::Vector3d ObjPredictor::evaluateConstVelVelocity(int obj_id)
+  {
+    if (obj_id < obj_num_ && predict_trajs_->at(obj_id).valid())
+    {
+      return predict_trajs_->at(obj_id).evaluateConstVelVelocity();
     }
 
     double MAX = std::numeric_limits<double>::max();

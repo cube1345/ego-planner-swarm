@@ -20,6 +20,7 @@ namespace ego_planner
     node->declare_parameter("manager/planning_horizon", 5.0);
     node->declare_parameter("manager/use_distinctive_trajs", false);
     node->declare_parameter("manager/drone_id", -1);
+    node->declare_parameter("prediction/enable", false);
 
     node->get_parameter("manager/max_vel", pp_.max_vel_);
     node->get_parameter("manager/max_acc", pp_.max_acc_);
@@ -29,11 +30,19 @@ namespace ego_planner
     node->get_parameter("manager/planning_horizon", pp_.planning_horizen_);
     node->get_parameter("manager/use_distinctive_trajs", pp_.use_distinctive_trajs);
     node->get_parameter("manager/drone_id", pp_.drone_id);
+    bool prediction_enable = false;
+    node->get_parameter("prediction/enable", prediction_enable);
 
     local_data_.traj_id_ = 0;
     grid_map_.reset(new GridMap);
     // grid_map_->initMap(nh);
     grid_map_->initMap(node);
+
+    if (prediction_enable)
+    {
+      obj_predictor_.reset(new fast_planner::ObjPredictor);
+      obj_predictor_->init(node);
+    }
 
     bspline_optimizer_.reset(new BsplineOptimizer);
     // bspline_optimizer_->setParam(nh);

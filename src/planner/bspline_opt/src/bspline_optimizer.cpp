@@ -12,9 +12,17 @@ namespace ego_planner
     node->declare_parameter("optimization/lambda_collision", -1.0);
     node->declare_parameter("optimization/lambda_feasibility", -1.0);
     node->declare_parameter("optimization/lambda_fitness", -1.0);
+    node->declare_parameter("optimization/lambda_moving_obstacle", 0.0);
 
     node->declare_parameter("optimization/dist0", -1.0);
     node->declare_parameter("optimization/swarm_clearance", -1.0);
+    node->declare_parameter("optimization/moving_obstacle_enable", false);
+    node->declare_parameter("optimization/moving_obstacle_clearance", 1.5);
+    node->declare_parameter("optimization/moving_obstacle_time_horizon", 3.0);
+    node->declare_parameter("optimization/moving_obstacle_latency", 0.35);
+    node->declare_parameter("optimization/moving_obstacle_max_clearance", 2.5);
+    node->declare_parameter("optimization/moving_obstacle_relative_velocity_gain", 1.0);
+    node->declare_parameter("optimization/moving_obstacle_approaching_weight", 0.35);
     node->declare_parameter("optimization/max_vel", -1.0);
     node->declare_parameter("optimization/max_acc", -1.0);
 
@@ -24,9 +32,17 @@ namespace ego_planner
     node->get_parameter("optimization/lambda_collision", lambda2_);
     node->get_parameter("optimization/lambda_feasibility", lambda3_);
     node->get_parameter("optimization/lambda_fitness", lambda4_);
+    node->get_parameter("optimization/lambda_moving_obstacle", lambda_moving_obstacle_);
 
     node->get_parameter("optimization/dist0", dist0_);
     node->get_parameter("optimization/swarm_clearance", swarm_clearance_);
+    node->get_parameter("optimization/moving_obstacle_enable", moving_obstacle_enable_);
+    node->get_parameter("optimization/moving_obstacle_clearance", moving_obstacle_clearance_);
+    node->get_parameter("optimization/moving_obstacle_time_horizon", moving_obstacle_time_horizon_);
+    node->get_parameter("optimization/moving_obstacle_latency", moving_obstacle_latency_);
+    node->get_parameter("optimization/moving_obstacle_max_clearance", moving_obstacle_max_clearance_);
+    node->get_parameter("optimization/moving_obstacle_relative_velocity_gain", moving_obstacle_relative_velocity_gain_);
+    node->get_parameter("optimization/moving_obstacle_approaching_weight", moving_obstacle_approaching_weight_);
     node->get_parameter("optimization/max_vel", max_vel_);
     node->get_parameter("optimization/max_acc", max_acc_);
 
@@ -927,21 +943,73 @@ namespace ego_planner
   void BsplineOptimizer::calcMovingObjCost(const Eigen::MatrixXd &q, double &cost, Eigen::MatrixXd &gradient)
   {
     cost = 0.0;
+    if (!moving_obstacle_enable_ || moving_objs_ == nullptr || lambda_moving_obstacle_ <= 0.0)
+    {
+      return;
+    }
+
     int end_idx = q.cols() - order_;
-    constexpr double CLEARANCE = 1.5;
+    const double BASE_CLEARANCE = std::max(0.05, moving_obstacle_clearance_);
+    const double LATENCY = std::max(0.0, moving_obstacle_latency_);
+    const double MAX_CLEARANCE = std::max(BASE_CLEARANCE, moving_obstacle_max_clearance_);
+    const double REL_VEL_GAIN = std::max(0.0, moving_obstacle_relative_velocity_gain_);
+    const double APPROACH_WEIGHT = std::max(0.0, moving_obstacle_approaching_weight_);
     double t_now = rclcpp::Clock().now().seconds();
 
     for (int i = order_; i < end_idx; i++)
     {
       double time = ((double)(order_ - 1) / 2 + (i - order_ + 1)) * bspline_interval_;
+      if (time > moving_obstacle_time_horizon_)
+      {
+        continue;
+      }
 
       for (int id = 0; id < moving_objs_->getObjNums(); id++)
       {
         Eigen::Vector3d obj_prid = moving_objs_->evaluateConstVel(id, t_now + time);
+        Eigen::Vector3d obj_vel = moving_objs_->evaluateConstVelVelocity(id);
+        if (!std::isfinite(obj_prid(0)) || !std::isfinite(obj_prid(1)) || !std::isfinite(obj_prid(2)))
+        {
+          continue;
+        }
+        if (!std::isfinite(obj_vel(0)) || !std::isfinite(obj_vel(1)) || !std::isfinite(obj_vel(2)))
+        {
+          obj_vel.setZero();
+        }
+
+        Eigen::Vector3d uav_vel = Eigen::Vector3d::Zero();
+        if (i + 1 < q.cols())
+        {
+          uav_vel = (q.col(i + 1) - q.col(i)) / std::max(1e-3, bspline_interval_);
+        }
+        else if (i > 0)
+        {
+          uav_vel = (q.col(i) - q.col(i - 1)) / std::max(1e-3, bspline_interval_);
+        }
+        Eigen::Vector3d rel_vel = uav_vel - obj_vel;
+
         double dist = (cps_.points.col(i) - obj_prid).norm();
         // cout /*<< "cps_.points.col(i)=" << cps_.points.col(i).transpose()*/ << " moving_objs_=" << obj_prid.transpose() << " dist=" << dist << endl;
-        double dist_err = CLEARANCE - dist;
-        Eigen::Vector3d dist_grad = (cps_.points.col(i) - obj_prid).normalized();
+        Eigen::Vector3d rel_pos = cps_.points.col(i) - obj_prid;
+        double approaching_speed = 0.0;
+        if (dist > 1e-3)
+        {
+          approaching_speed = std::max(0.0, -rel_pos.dot(rel_vel) / dist);
+        }
+        double adaptive_clearance =
+            BASE_CLEARANCE + REL_VEL_GAIN * rel_vel.norm() * LATENCY + 0.5 * max_acc_ * LATENCY * LATENCY;
+        adaptive_clearance = std::min(MAX_CLEARANCE, std::max(BASE_CLEARANCE, adaptive_clearance));
+
+        double dist_err = adaptive_clearance - dist;
+        Eigen::Vector3d dist_grad;
+        if (dist > 1e-3)
+        {
+          dist_grad = rel_pos / dist;
+        }
+        else
+        {
+          dist_grad = Eigen::Vector3d::UnitX();
+        }
 
         if (dist_err < 0)
         {
@@ -949,8 +1017,9 @@ namespace ego_planner
         }
         else
         {
-          cost += pow(dist_err, 2);
-          gradient.col(i) += -2.0 * dist_err * dist_grad;
+          double approaching_scale = 1.0 + APPROACH_WEIGHT * approaching_speed;
+          cost += approaching_scale * pow(dist_err, 2);
+          gradient.col(i) += -2.0 * approaching_scale * dist_err * dist_grad;
         }
       }
       // cout << "time=" << time << " i=" << i << " order_=" << order_ << " end_idx=" << end_idx << endl;
@@ -1807,28 +1876,28 @@ namespace ego_planner
     memcpy(cps_.points.data() + 3 * order_, x, n * sizeof(x[0]));
 
     /* ---------- evaluate cost and gradient ---------- */
-    double f_smoothness, f_distance, f_feasibility /*, f_mov_objs*/, f_swarm, f_terminal;
+    double f_smoothness, f_distance, f_feasibility, f_mov_objs, f_swarm, f_terminal;
 
     Eigen::MatrixXd g_smoothness = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_distance = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_feasibility = Eigen::MatrixXd::Zero(3, cps_.size);
-    // Eigen::MatrixXd g_mov_objs = Eigen::MatrixXd::Zero(3, cps_.size);
+    Eigen::MatrixXd g_mov_objs = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_swarm = Eigen::MatrixXd::Zero(3, cps_.size);
     Eigen::MatrixXd g_terminal = Eigen::MatrixXd::Zero(3, cps_.size);
 
     calcSmoothnessCost(cps_.points, f_smoothness, g_smoothness);
     calcDistanceCostRebound(cps_.points, f_distance, g_distance, iter_num_, f_smoothness);
     calcFeasibilityCost(cps_.points, f_feasibility, g_feasibility);
-    // calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
+    calcMovingObjCost(cps_.points, f_mov_objs, g_mov_objs);
     calcSwarmCost(cps_.points, f_swarm, g_swarm);
     calcTerminalCost(cps_.points, f_terminal, g_terminal);
 
-    f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
-    // f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility + new_lambda2_ * f_mov_objs;
+    f_combine = lambda1_ * f_smoothness + new_lambda2_ * f_distance + lambda3_ * f_feasibility +
+                lambda_moving_obstacle_ * f_mov_objs + new_lambda2_ * f_swarm + lambda2_ * f_terminal;
     // printf("origin %f %f %f %f\n", f_smoothness, f_distance, f_feasibility, f_combine);
 
-    Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
-    // Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility + new_lambda2_ * g_mov_objs;
+    Eigen::MatrixXd grad_3D = lambda1_ * g_smoothness + new_lambda2_ * g_distance + lambda3_ * g_feasibility +
+                              lambda_moving_obstacle_ * g_mov_objs + new_lambda2_ * g_swarm + lambda2_ * g_terminal;
     memcpy(grad, grad_3D.data() + 3 * order_, n * sizeof(grad[0]));
   }
 

@@ -159,11 +159,19 @@ namespace ego_planner
     double lambda2_, new_lambda2_; // distance weight
     double lambda3_;               // feasibility weight
     double lambda4_;               // curve fitting
+    double lambda_moving_obstacle_;
 
     int a;
     //
     double dist0_, swarm_clearance_; // safe distance
+    double moving_obstacle_clearance_;
+    double moving_obstacle_time_horizon_;
+    double moving_obstacle_latency_;
+    double moving_obstacle_max_clearance_;
+    double moving_obstacle_relative_velocity_gain_;
+    double moving_obstacle_approaching_weight_;
     double max_vel_, max_acc_;       // dynamic limits
+    bool moving_obstacle_enable_;
 
     int variable_num_;              // optimization variables
     int iter_num_;                  // iteration of the solver

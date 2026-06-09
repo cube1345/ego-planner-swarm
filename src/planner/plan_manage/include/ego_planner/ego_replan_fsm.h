@@ -61,6 +61,11 @@ namespace ego_planner
     int waypoint_num_, wp_id_;
     double planning_horizen_, planning_horizen_time_;
     double emergency_time_;
+    bool moving_obstacle_ttc_enable_;
+    double moving_obstacle_ttc_horizon_;
+    double moving_obstacle_ttc_clearance_;
+    double moving_obstacle_ttc_latency_;
+    double moving_obstacle_ttc_max_clearance_;
     bool flag_realworld_experiment_;
     bool enable_fail_safe_;
 
