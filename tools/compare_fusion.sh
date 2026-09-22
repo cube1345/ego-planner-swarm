@@ -86,6 +86,7 @@ POINT0_Y="0.0"
 POINT0_Z="1.0"
 MAX_VEL="1.5"
 MAX_ACC="6.0"
+LIDAR_HORIZONTAL_FOV="360.0"
 LOCAL_UPDATE_RANGE_X="5.5"
 LOCAL_UPDATE_RANGE_Y="5.5"
 LOCAL_UPDATE_RANGE_Z="4.5"
@@ -192,6 +193,7 @@ Usage: bash tools/compare_fusion.sh [options]
   --point0-z FLOAT
   --max-vel FLOAT
   --max-acc FLOAT
+  --lidar-fov FLOAT
   --local-update-range-x FLOAT
   --local-update-range-y FLOAT
   --local-update-range-z FLOAT
@@ -296,6 +298,7 @@ while [[ $# -gt 0 ]]; do
     --point0-z) POINT0_Z="$2"; shift 2 ;;
     --max-vel) MAX_VEL="$2"; shift 2 ;;
     --max-acc) MAX_ACC="$2"; shift 2 ;;
+    --lidar-fov) LIDAR_HORIZONTAL_FOV="$2"; shift 2 ;;
     --local-update-range-x) LOCAL_UPDATE_RANGE_X="$2"; LOCAL_UPDATE_RANGE_X_EXPLICIT="True"; shift 2 ;;
     --local-update-range-y) LOCAL_UPDATE_RANGE_Y="$2"; LOCAL_UPDATE_RANGE_Y_EXPLICIT="True"; shift 2 ;;
     --local-update-range-z) LOCAL_UPDATE_RANGE_Z="$2"; shift 2 ;;
@@ -425,6 +428,7 @@ ros2 launch ego_planner single_run_in_sim_fusion.launch.py \
   fusion_resolution:="$FUSION_RESOLUTION" \
   max_vel:="$MAX_VEL" \
   max_acc:="$MAX_ACC" \
+  lidar_horizontal_fov:="$LIDAR_HORIZONTAL_FOV" \
   local_update_range_x:="$LOCAL_UPDATE_RANGE_X" \
   local_update_range_y:="$LOCAL_UPDATE_RANGE_Y" \
   local_update_range_z:="$LOCAL_UPDATE_RANGE_Z" \

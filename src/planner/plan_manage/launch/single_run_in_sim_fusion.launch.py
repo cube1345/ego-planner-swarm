@@ -46,6 +46,7 @@ def launch_setup(context, *args, **kwargs):
     adaptive_near_field_radius_max = LaunchConfiguration('adaptive_near_field_radius_max').perform(context)
     adaptive_near_field_radius_step = LaunchConfiguration('adaptive_near_field_radius_step').perform(context)
     lidar_growth = LaunchConfiguration('lidar_growth').perform(context)
+    lidar_horizontal_fov = LaunchConfiguration('lidar_horizontal_fov').perform(context)
     depth_decay = LaunchConfiguration('depth_decay').perform(context)
     adaptive_depth_decay_enable = LaunchConfiguration('adaptive_depth_decay_enable').perform(context)
     adaptive_depth_decay_min = LaunchConfiguration('adaptive_depth_decay_min').perform(context)
@@ -297,7 +298,7 @@ def launch_setup(context, *args, **kwargs):
             {'frame_id': 'world'},
             {'publish_rate': 10.0},
             {'max_range': 8.0},
-            {'horizontal_fov_deg': 240.0},
+            {'horizontal_fov_deg': float(lidar_horizontal_fov)},
             {'vertical_min_deg': -18.0},
             {'vertical_max_deg': 18.0},
             {'voxel_size': 0.18},
@@ -511,6 +512,7 @@ def generate_launch_description():
         DeclareLaunchArgument('dynamic_gt_score_enable', default_value='False'),
         DeclareLaunchArgument('max_vel', default_value='1.5'),
         DeclareLaunchArgument('max_acc', default_value='6.0'),
+        DeclareLaunchArgument('lidar_horizontal_fov', default_value='360.0'),
         DeclareLaunchArgument('local_update_range_x', default_value='5.5'),
         DeclareLaunchArgument('local_update_range_y', default_value='5.5'),
         DeclareLaunchArgument('local_update_range_z', default_value='4.5'),
