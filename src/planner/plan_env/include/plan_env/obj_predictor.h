@@ -94,13 +94,13 @@ namespace fast_planner
 
     Eigen::Vector3d evaluateConstVel(double t)
     {
-      Eigen::Matrix<double, 2, 1> tv;
-      tv << 1.0, pow(t - global_start_time_.seconds(), 1);
+      double dt = t - global_start_time_.seconds();
 
-      // cout << t-global_start_time_.toSec() << endl;
-
+      // 支持匀加速模型：polys 前三项为 [p0, v0, a0]
       Eigen::Vector3d pt;
-      pt(0) = tv.dot(polys[0].head(2)), pt(1) = tv.dot(polys[1].head(2)), pt(2) = tv.dot(polys[2].head(2));
+      pt(0) = polys[0](0) + polys[0](1) * dt + 0.5 * polys[0](2) * dt * dt;
+      pt(1) = polys[1](0) + polys[1](1) * dt + 0.5 * polys[1](2) * dt * dt;
+      pt(2) = polys[2](0) + polys[2](1) * dt + 0.5 * polys[2](2) * dt * dt;
 
       return pt;
     }

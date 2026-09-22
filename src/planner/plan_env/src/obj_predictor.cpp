@@ -237,61 +237,84 @@ namespace fast_planner
   {
     for (int i = 0; i < obj_num_; i++)
     {
-      /* ---------- get the last two point ---------- */
+      /* ---------- get history ---------- */
       list<Eigen::Vector4d> his;
       obj_histories_[i]->getHistory(his);
       if (his.size() < 2)
         continue;
-      // if ( i==0 )
-      // {
-      //   cout << "his.size()=" << his.size() << endl;
-      //   for ( auto hi:his )
-      //   {
-      //     cout << hi.transpose() << endl;
-      //   }
-      // }
-      list<Eigen::Vector4d>::iterator list_it = his.end();
-
-      /* ---------- test iteration ---------- */
-      // cout << "----------------------------" << endl;
-      // for (auto v4d : his)
-      //   cout << "v4d: " << v4d.transpose() << endl;
-
-      Eigen::Vector3d q1, q2;
-      double t1, t2;
-
-      --list_it;
-      q2 = (*list_it).head(3);
-      t2 = (*list_it)(3);
-
-      --list_it;
-      q1 = (*list_it).head(3);
-      t1 = (*list_it)(3);
-
-      Eigen::Matrix<double, 2, 3> p01, q12;
-      q12.row(0) = q1.transpose();
-      q12.row(1) = q2.transpose();
-
-      Eigen::Matrix<double, 2, 2> At12;
-      At12 << 1, t1, 1, t2;
-
-      p01 = At12.inverse() * q12;
 
       vector<Eigen::Matrix<double, 6, 1>> polys(3);
-      for (int j = 0; j < 3; ++j)
+
+      if (his.size() >= 3)
       {
-        polys[j].setZero();
-        polys[j].head(2) = p01.col(j);
+        /* 匀加速拟合：p = p0 + v*t + 0.5*a*t^2 */
+        list<Eigen::Vector4d>::iterator list_it = his.end();
+        Eigen::Vector3d q1, q2, q3;
+        double t1, t2, t3;
+
+        --list_it;
+        q3 = (*list_it).head(3);
+        t3 = (*list_it)(3);
+
+        --list_it;
+        q2 = (*list_it).head(3);
+        t2 = (*list_it)(3);
+
+        --list_it;
+        q1 = (*list_it).head(3);
+        t1 = (*list_it)(3);
+
+        Eigen::Matrix<double, 3, 3> A;
+        Eigen::Matrix<double, 3, 3> Q;
+        A << 1.0, t1, 0.5 * t1 * t1,
+            1.0, t2, 0.5 * t2 * t2,
+            1.0, t3, 0.5 * t3 * t3;
+        Q.row(0) = q1.transpose();
+        Q.row(1) = q2.transpose();
+        Q.row(2) = q3.transpose();
+
+        Eigen::Matrix<double, 3, 3> coeff = A.inverse() * Q; // rows = [p0, v0, a0], cols = xyz
+        for (int j = 0; j < 3; ++j)
+        {
+          polys[j].setZero();
+          polys[j].head(3) = coeff.col(j);
+        }
+
+        predict_trajs_->at(i).setPolynomial(polys);
+        predict_trajs_->at(i).setTime(t1, t3);
       }
+      else
+      {
+        /* fallback: 匀速拟合 */
+        list<Eigen::Vector4d>::iterator list_it = his.end();
+        Eigen::Vector3d q1, q2;
+        double t1, t2;
 
-      // if ( i==0 )
-      // {
-      //   cout << "q1=" << q1.transpose() << " t1=" << t1 << " q2=" << q2.transpose() << " t2=" << t2 << endl;
-      //   cout << "polys=" << polys[0].transpose() << endl;
-      // }
+        --list_it;
+        q2 = (*list_it).head(3);
+        t2 = (*list_it)(3);
 
-      predict_trajs_->at(i).setPolynomial(polys);
-      predict_trajs_->at(i).setTime(t1, t2);
+        --list_it;
+        q1 = (*list_it).head(3);
+        t1 = (*list_it)(3);
+
+        Eigen::Matrix<double, 2, 3> q12;
+        q12.row(0) = q1.transpose();
+        q12.row(1) = q2.transpose();
+
+        Eigen::Matrix<double, 2, 2> At12;
+        At12 << 1.0, t1, 1.0, t2;
+
+        Eigen::Matrix<double, 2, 3> p01 = At12.inverse() * q12;
+        for (int j = 0; j < 3; ++j)
+        {
+          polys[j].setZero();
+          polys[j].head(2) = p01.col(j);
+        }
+
+        predict_trajs_->at(i).setPolynomial(polys);
+        predict_trajs_->at(i).setTime(t1, t2);
+      }
     }
   }
 
