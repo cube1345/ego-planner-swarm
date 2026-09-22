@@ -208,3 +208,34 @@ F1        = 2 * precision * recall / (precision + recall)
 3. 对接近无人机的动态障碍提高权重。
 4. 限制过激重规划，保持控制平滑。
 5. 对 moving obstacle 加入时间预测或 TTC 风险项。
+
+## 2026-09-22 避障质量优化（已验证）
+
+本轮围绕「避障飞行质量」做系统优化，产出三个有效算法改进 + 一套深度学习框架。
+
+### A* 前端搜索越界修复
+
+**问题**：`bspline_optimizer.cpp` 两处 `AstarSearch` 把原作者动态步长 `(in-out).norm()/10+0.05` 改成了固定 `0.1`。`POOL_SIZE=100³` 下覆盖范围仅 `center±5m`，障碍段超 10m 时 `Coord2Index` 越界 → `initControlPoints` 返回空 → 反复紧急重规划。
+
+**修复**：恢复动态步长，index 偏移恒 ≈5（远小于 pool 半宽 50）。效果：replan 51~1258 → 25~46。
+
+### lidar 视场 360°
+
+**问题**：fusion recall 低（0.16）主因是视场盲区（lidar 240°、radar 120°），GT 评测是 10m 全向，后方障碍天然漏检。
+
+**修复**：lidar `horizontal_fov` 240° → 360°。效果：recall +24%（0.163→0.203）、f1 +20%（0.280→0.337）、collision 均值 0.66→0.53。
+
+### 匀加速动态障碍预测器
+
+**问题**：`predictCallback` 里 `predictPolyFit()` 被注释，只用两点匀速外推，对正弦运动障碍误差大。
+
+**修复**：`predictConstVel` 改为三点匀加速拟合（`p = p0 + v·t + ½a·t²`）。效果：`min_dynamic_obstacle_distance` 0.67→1.55m（+131%），动态违规率 0。
+
+### 深度学习自适应参数框架（`tools/rl_adaptive/`）
+
+用监督学习拟合 `Q(s,a)` 替代手工评分 `gain_f1 + 0.35*gain_recall`，奖励用闭环信号（collision/path/replan/D-S belief，无 GT 依赖）。状态 10 维全闭环、动作 72 个离散候选。
+
+### 验证无效/有害的方向
+
+`lambda_collision` / `obstacles_inflation` / `dist0` / `max_range` / TTC / 加速度 clamp / 时序累积——均边际或有害。核心结论：`collision_risk` 硬上限是 mockamap 场景密度，唯一有效感知改进是扩大视场覆盖。
+

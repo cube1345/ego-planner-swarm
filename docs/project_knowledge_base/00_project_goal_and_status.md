@@ -48,12 +48,18 @@
   - `lidar_radar=126`
   - `tri_modal=103`
   - `multi=1737`
+- 避障质量优化（2026-09-22，已提交 3 个 commit）：
+  - `601d57e` A* 越界修复：replan 51~1258 → 25~46
+  - `bc20dad` lidar FOV 240°→360°：fusion recall +24%、f1 +20%、collision 0.66→0.53
+  - `8c64cc0` 匀加速 predictor：min_dynamic_distance 0.67→1.55m（+131%）、动态违规 0
+- 新增深度学习自适应参数框架（未提交）：
+  - `tools/rl_adaptive/`：Q 函数拟合替代手工评分，无 GT 依赖的闭环奖励
 
 ## 当前待完成
 
 1. 将 radar 贡献统计写入 `/drone_0_fusion/ds_metrics`。
 2. 对比二模态和三模态的指标变化。
-3. 继续优化动态避障参数和 fusion 参数。
+3. 在算力平台训练 `tools/rl_adaptive/` 的 Q 网络，验证是否优于手工评分 `gain_f1 + 0.35*gain_recall`。
 4. 整理更完整的实验表，包括配置、指标、结论。
 
 ## 当前已知环境问题

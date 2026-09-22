@@ -133,6 +133,34 @@ depth_radar/lidar_radar/tri_modal 均非 0，说明 radar 对融合结果有可�
 4. 默认 CycloneDDS 在沙箱中枚举 UDP 网卡失败。
    - 处理：使用 `RMW_IMPLEMENTATION=rmw_fastrtps_cpp`，节点可继续启动并输出日志。
 
+## 2026-09-22
+
+### 避障质量系统优化
+
+本轮围绕「避障飞行质量」展开，产出 3 个已提交的算法改进 + 1 套深度学习框架。
+
+**已提交（3 个 commit，`dynamic-obstacle-avoidance-archive` 分支）**：
+
+- `601d57e` A* 越界修复：replan 51~1258 → 25~46
+- `bc20dad` lidar FOV 240°→360°：recall +24%、f1 +20%、collision 0.66→0.53
+- `8c64cc0` 匀加速 predictor：min_dynamic_distance 0.67→1.55m（+131%）
+
+**新增（未提交）**：
+
+- `tools/rl_adaptive/` 深度学习自适应参数框架（Q 函数拟合替代手工评分 `gain_f1 + 0.35*gain_recall`）
+
+**验证结论**：
+
+- 有效：A* 修复、FOV 360°、匀加速 predictor
+- 无效/有害：lambda_collision / inflation / dist0 / max_range / TTC / clamp / 时序累积
+- 核心结论：collision_risk 硬上限是 mockamap 场景密度，唯一有效感知改进是扩大视场覆盖
+
+**关键场景与命令**：
+
+- 动态避障横穿路径：`--dynamic-obstacles-specs "0.0,0.0,0.75,0.30,1.10,0.0,3.0,9.0,0.0"`
+- FOV 对比：`--lidar-fov 240/360`
+- 评测：`bash tools/compare_fusion.sh --dynamic-obstacles-enable True --use-mockamap True`
+
 ## 待补实验记录模板
 
 每次实验建议按下面格式追加：

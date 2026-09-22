@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-22
+
+### Planner / Dynamic Obstacle Avoidance
+
+- Fixed A* search step size (fixed `0.1` → adaptive `(in-out).norm()/10+0.05`) to prevent `Coord2Index` pool out-of-range, stabilizing replan from 51~1258 down to 25~46.
+- Upgraded the moving-object predictor from constant-velocity to constant-acceleration (`p = p0 + v·t + ½a·t²`), raising `min_dynamic_obstacle_distance` from 0.67 m to 1.55 m (+131%) with zero dynamic safety violations.
+
+### Perception / Fusion
+
+- Widened simulated lidar FOV from 240° to 360°, raising fusion recall from 0.163 to 0.203 (+24%) and f1 from 0.280 to 0.337 (+20%), collision_risk mean from 0.66 to 0.53.
+
+### Deep-Learning Adaptive Parameters (new)
+
+- Added `tools/rl_adaptive/` — a Q-function training framework that learns `Q(s,a)` to replace the hand-crafted fusion scoring `gain_f1 + 0.35*gain_recall`, using GT-free closed-loop rewards (collision / path / replan / D-S belief).
+
+### Evaluated and Rejected
+
+- `lambda_collision` / `obstacles_inflation` / `dist0` / `max_range` / TTC / acceleration-clamp / temporal occupancy accumulation — all marginal or harmful for collision_risk, whose hard ceiling is mockamap scene density.
+
 ## 2026-05-03
 
 ### Simulation And RViz
