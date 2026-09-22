@@ -116,6 +116,7 @@ install(
 install(
   PROGRAMS
     scripts/simulated_lidar_cloud.py
+    scripts/simulated_mmwave_radar_cloud.py
     scripts/dynamic_obstacle_cloud.py
     scripts/ros2_lidar_depth_fusion_node.py
     scripts/fusion_benefit_report.py

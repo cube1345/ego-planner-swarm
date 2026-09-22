@@ -50,15 +50,22 @@ def stamp_to_ns(stamp) -> int:
 class VoxelEvidence:
     logit_sum: float = 0.0
     hits: int = 0
+
     seen_depth: bool = False
     seen_lidar: bool = False
+    seen_radar: bool = False
+    
     depth_occ_mass: float = 0.0
     depth_free_mass: float = 0.0
     depth_unknown_mass: float = 1.0
+    
     lidar_occ_mass: float = 0.0
     lidar_free_mass: float = 0.0
     lidar_unknown_mass: float = 1.0
 
+    radar_occ_mass: float = 0.0
+    radar_free_mass: float = 0.0
+    radar_unknown_mass: float = 1.0
 
 @dataclass
 class Scores:
@@ -81,6 +88,16 @@ class LidarDepthFusionNode(Node):
 
         self.declare_parameter("depth_cloud_topic", "/drone_0_pcl_render_node/cloud")
         self.declare_parameter("lidar_cloud_topic", "/lidar/points")
+
+
+        # radar相关参数
+        self.declare_parameter("radar_cloud_topic","")
+        self.declare_parameter("radar_cloud_timeout_sec",0.35)
+        self.declare_parameter("radar_max_range",10.0)
+        self.declare_parameter("radar_growth",6.0)
+        self.declare_parameter("radar_dynamic_bonus",0.02)
+        self.declare_parameter("radar_requires_geometry_support",True)
+
         self.declare_parameter("odom_topic", "/drone_0_visual_slam/odom")
         self.declare_parameter("output_topic", "/drone_0_fusion/fused_cloud")
         self.declare_parameter("output_frame", "world")
@@ -151,6 +168,15 @@ class LidarDepthFusionNode(Node):
 
         self.depth_cloud_topic = str(self.get_parameter("depth_cloud_topic").value)
         self.lidar_cloud_topic = str(self.get_parameter("lidar_cloud_topic").value)
+
+        #radar相关参数读取
+        self.radar_cloud_topic = str(self.get_parameter("radar_cloud_topic").value).strip()
+        self.radar_cloud_timeout_sec = max(0.0,float(self.get_parameter("radar_cloud_timeout_sec").value))
+        self.radar_max_range = float(self.get_parameter("radar_max_range").value)
+        self.radar_growth = float(self.get_parameter("radar_growth").value)
+        self.radar_dynamic_bonus = max(0.0,float(self.get_parameter("radar_dynamic_bonus").value))
+        self.radar_requires_geometry_support = bool(self.get_parameter("radar_requires_geometry_support").value)
+
         self.odom_topic = str(self.get_parameter("odom_topic").value)
         self.output_topic = str(self.get_parameter("output_topic").value)
         self.output_frame = str(self.get_parameter("output_frame").value)
@@ -357,6 +383,11 @@ class LidarDepthFusionNode(Node):
         self.frame_count = 0
         self.global_keys = np.empty((0, 3), dtype=np.int32)
         self.global_centers = np.empty((0, 3), dtype=np.float32)
+
+        # 保存radar最新点云
+        self.latest_radar_points = np.empty((0,3),dtype = np.float32)
+        self.last_radar_cloud_wall = 0.0
+
         self.closed_loop_score_ema = 0.0
         self.closed_loop_feedback_ready = False
         self.closed_loop_candidate_scores: dict[Tuple[float, int, float, float, float], float] = {}
@@ -367,10 +398,17 @@ class LidarDepthFusionNode(Node):
 
         self.create_subscription(Odometry, self.odom_topic, self.odom_callback, 20)
         self.create_subscription(PointCloud2, self.global_cloud_topic, self.global_cloud_callback, 10)
+        
+        if self.radar_cloud_topic:
+            self.create_subscription(
+                PointCloud2,self.radar_cloud_topic,self.radar_cloud_callback,10
+            )       
+        
         if self.closed_loop_feedback_enable:
             self.create_subscription(
                 String, self.closed_loop_feedback_topic, self.closed_loop_feedback_callback, 10
             )
+        
         self.fused_pub = self.create_publisher(PointCloud2, self.output_topic, 10)
         self.ds_metrics_pub = self.create_publisher(String, self.ds_metrics_topic, 10)
 
@@ -383,6 +421,7 @@ class LidarDepthFusionNode(Node):
             allow_headerless=False,
         )
         self.sync.registerCallback(self.sync_callback)
+
 
         self.get_logger().info(
             f"Fusion node ready. depth={self.depth_cloud_topic} "
@@ -486,7 +525,26 @@ class LidarDepthFusionNode(Node):
             self.global_centers = (keys.astype(np.float32) + 0.5) * self.resolution
         self.have_global = True
 
+    def radar_cloud_callback(self,msg: PointCloud2):
+        points = self.cloud_to_xyz(msg)
+        if points.size == 0:
+            self.latest_radar_points = np.empty((0,3),dtype=np.float32)
+        else:
+            self.latest_radar_points = points
+        self.last_radar_cloud_wall = time.time()
+
+    def fresh_radar_points(self) -> np.ndarray:
+        if not self.radar_cloud_topic or self.latest_radar_points.size == 0:
+            return np.empty((0,3),dtype=np.float32)
+        
+        if self.radar_cloud_timeout_sec > 0.0:
+            age =  time.time() - self.last_radar_cloud_wall
+            if age > self.radar_cloud_timeout_sec:
+                return np.empty((0,3),dtype=np.float32)
+        return self.filter_points(self.latest_radar_points,range_limit=self.radar_max_range)
+
     def sync_callback(self, depth_msg: PointCloud2, lidar_msg: PointCloud2) -> None:
+
         if not self.have_odom:
             self.get_logger().warn("Skipping fusion frame: odom not available yet.")
             return
@@ -498,10 +556,12 @@ class LidarDepthFusionNode(Node):
 
         depth_pts = self.filter_points(depth_pts)
         lidar_pts = self.filter_points(lidar_pts)
+        radar_pts = self.fresh_radar_points()
 
         fusion_state = self.build_fusion_state(
             depth_pts,
             lidar_pts,
+            radar_pts,
             self.current_near_field_radius,
             self.current_lidar_growth,
         )
@@ -517,10 +577,19 @@ class LidarDepthFusionNode(Node):
         self.frame_count += 1
         if self.frame_count % max(1, self.debug_period) == 0:
             self.get_logger().info(
+
                 f"fusion frame={self.frame_count} depth_pts={stats['depth_points']} "
-                f"lidar_pts={stats['lidar_points']} fused_voxels={stats['fused_voxels']} "
+                f"lidar_pts={stats['lidar_points']} radar_pts={stats['radar_points']} "
+                f"fused_voxels={stats['fused_voxels']} "
                 f"depth_only={stats['depth_only_voxels']} lidar_only={stats['lidar_only_voxels']} "
+                f"radar_only={stats['radar_only_voxels']} "
+                f"depth_lidar={stats['depth_lidar_voxels']} "
+                f"depth_radar={stats['depth_radar_voxels']} "
+                f"lidar_radar={stats['lidar_radar_voxels']} "
+                f"tri_modal={stats['tri_modal_voxels']} "
+                f"multi={stats['multi_modal_voxels']} "
                 f"dual={stats['dual_voxels']} retention={stats['retention_ratio']:.3f} "
+
                 f"min_prob={self.current_min_probability:.3f} "
                 f"near_radius={self.current_near_field_radius:.2f} "
                 f"lidar_growth={self.current_lidar_growth:.2f} "
@@ -571,6 +640,11 @@ class LidarDepthFusionNode(Node):
         far_bonus = np.where(ranges > near_field_radius, 0.10, 0.0)
         return clamp_prob(base + far_bonus)
 
+    def radar_probability(self,ranges: np.ndarray,near_field_radius:float) -> np.ndarray:
+        base = 0.38+0.34*(1.0 - np.exp(-ranges/max(self.radar_growth,1e-3)))
+        far_bonus = np.where(ranges > near_field_radius,0.06,0.0)
+        return clamp_prob(base+far_bonus+self.radar_dynamic_bonus)
+
     def build_modality_state(self, points: np.ndarray) -> ModalityVoxelState:
         if points.size == 0:
             return ModalityVoxelState(
@@ -587,6 +661,7 @@ class LidarDepthFusionNode(Node):
         key_tuples = [
             (int(key_arr[0]), int(key_arr[1]), int(key_arr[2])) for key_arr in unique_keys
         ]
+        
         return ModalityVoxelState(
             keys=unique_keys,
             key_tuples=key_tuples,
@@ -607,8 +682,13 @@ class LidarDepthFusionNode(Node):
 
         if modality == "depth":
             probs = self.depth_probability(state.ranges, near_field_radius)
-        else:
+        elif modality == "lidar":
             probs = self.lidar_probability(state.ranges, near_field_radius, lidar_growth)
+        elif modality == "radar":
+            probs = self.radar_probability(state.ranges,near_field_radius)
+        else:
+            return
+        
 
         hit_boost = np.minimum(np.log1p(state.counts), 1.6)
         logits = np.log(probs / (1.0 - probs)) * hit_boost
@@ -626,18 +706,25 @@ class LidarDepthFusionNode(Node):
                 item.depth_occ_mass = max(item.depth_occ_mass, occ_mass)
                 item.depth_free_mass = max(item.depth_free_mass, free_mass)
                 item.depth_unknown_mass = min(item.depth_unknown_mass, unknown_mass)
-            else:
+            elif modality == "lidar":
                 item.seen_lidar = True
                 item.lidar_occ_mass = max(item.lidar_occ_mass, occ_mass)
                 item.lidar_free_mass = max(item.lidar_free_mass, free_mass)
                 item.lidar_unknown_mass = min(item.lidar_unknown_mass, unknown_mass)
+            elif modality == "radar":
+                item.seen_radar = True
+                item.radar_occ_mass = max(item.radar_occ_mass,occ_mass)
+                item.radar_free_mass = max(item.radar_free_mass,free_mass)
+                item.radar_unknown_mass = min(item.radar_unknown_mass,unknown_mass)
 
     def compute_fusion_output(
         self,
         depth_state: ModalityVoxelState,
         lidar_state: ModalityVoxelState,
+        radar_state: ModalityVoxelState,
         near_field_radius: float,
         lidar_growth: float,
+
     ) -> dict:
         voxels: Dict[Tuple[int, int, int], VoxelEvidence] = defaultdict(VoxelEvidence)
         self.accumulate_voxel_state(
@@ -645,6 +732,9 @@ class LidarDepthFusionNode(Node):
         )
         self.accumulate_voxel_state(
             voxels, lidar_state, "lidar", near_field_radius, lidar_growth
+        )
+        self.accumulate_voxel_state(
+            voxels,radar_state,"radar",near_field_radius,lidar_growth
         )
 
         candidate_voxels = len(voxels)
@@ -668,21 +758,31 @@ class LidarDepthFusionNode(Node):
         self,
         depth_pts: np.ndarray,
         lidar_pts: np.ndarray,
+        radar_pts: np.ndarray,
         near_field_radius: float,
         lidar_growth: float,
     ) -> dict:
         depth_state = self.build_modality_state(depth_pts)
         lidar_state = self.build_modality_state(lidar_pts)
+        radar_state = self.build_modality_state(radar_pts)
         fusion_state = self.compute_fusion_output(
-            depth_state, lidar_state, near_field_radius, lidar_growth
+            depth_state, lidar_state, radar_state, near_field_radius, lidar_growth
         )
         fusion_state["depth_state"] = depth_state
         fusion_state["lidar_state"] = lidar_state
+        fusion_state["radar_state"] = radar_state
         fusion_state["depth_points"] = int(depth_pts.shape[0])
         fusion_state["lidar_points"] = int(lidar_pts.shape[0])
+        fusion_state["radar_points"] = int(radar_pts.shape[0])
         fusion_state["near_field_radius"] = float(near_field_radius)
         fusion_state["lidar_growth"] = float(lidar_growth)
+
         return fusion_state
+
+    def is_publishable_evidence(self,evidence:VoxelEvidence) -> bool:
+        if not self.radar_requires_geometry_support:
+            return True
+        return bool(evidence.seen_depth or evidence.seen_lidar)
 
     def select_fused_points(
         self, fusion_state: dict, threshold: float, min_hits: int
@@ -693,12 +793,19 @@ class LidarDepthFusionNode(Node):
         fused = []
         depth_only = 0
         lidar_only = 0
-        dual = 0
+        radar_only = 0
+        depth_lidar = 0
+        depth_radar = 0
+        lidar_radar = 0
+        tri_modal = 0
         ds_occ_values = []
         ds_unknown_values = []
         ds_conflict_values = []
 
         for key, evidence in voxels.items():
+
+            if not self.is_publishable_evidence(evidence):
+                continue
             probability = self.effective_probability(
                 float(voxel_probabilities[key]), evidence, self.current_dual_bonus
             )
@@ -709,12 +816,20 @@ class LidarDepthFusionNode(Node):
                 ds_occ_values.append(float(ds_metrics["belief_occupied"]))
                 ds_unknown_values.append(float(ds_metrics["unknown"]))
                 ds_conflict_values.append(float(ds_metrics["conflict"]))
-            if evidence.seen_depth and evidence.seen_lidar:
-                dual += 1
+            if evidence.seen_depth and evidence.seen_lidar and evidence.seen_radar:
+                tri_modal += 1
+            elif evidence.seen_depth and evidence.seen_lidar:
+                depth_lidar += 1
+            elif evidence.seen_depth and evidence.seen_radar:
+                depth_radar += 1
+            elif evidence.seen_lidar and evidence.seen_radar:
+                lidar_radar += 1
             elif evidence.seen_depth:
                 depth_only += 1
-            else:
+            elif evidence.seen_lidar:
                 lidar_only += 1
+            elif evidence.seen_radar:
+                radar_only += 1
             fused.append(((np.array(key, dtype=np.float32) + 0.5) * self.resolution).tolist())
 
         if fused:
@@ -725,11 +840,18 @@ class LidarDepthFusionNode(Node):
         stats = {
             "depth_points": fusion_state["depth_points"],
             "lidar_points": fusion_state["lidar_points"],
+            "radar_points": fusion_state["radar_points"],
             "candidate_voxels": fusion_state["candidate_voxels"],
             "fused_voxels": int(fused_np.shape[0]),
             "depth_only_voxels": depth_only,
             "lidar_only_voxels": lidar_only,
-            "dual_voxels": dual,
+            "radar_only_voxels": radar_only,
+            "depth_lidar_voxels": depth_lidar,
+            "depth_radar_voxels": depth_radar,
+            "lidar_radar_voxels": lidar_radar,
+            "tri_modal_voxels": tri_modal,
+            "dual_voxels": depth_lidar + depth_radar + lidar_radar,
+            "multi_modal_voxels": depth_radar + depth_lidar + lidar_radar + tri_modal,
             "retention_ratio": float(
                 fused_np.shape[0] / max(1, fusion_state["candidate_voxels"])
             ),
@@ -749,6 +871,9 @@ class LidarDepthFusionNode(Node):
             "conflict_mean": float(stats["ds_conflict_mean"]),
             "fused_voxels": int(stats["fused_voxels"]),
             "dual_voxels": int(stats["dual_voxels"]),
+            "min_probability": float(self.current_min_probability),
+            "min_hits": int(self.current_min_hits),
+            "dual_bonus": float(self.current_dual_bonus),
         }
         msg = String()
         msg.data = json.dumps(payload, separators=(",", ":"))
@@ -780,11 +905,26 @@ class LidarDepthFusionNode(Node):
             evidence.lidar_free_mass,
             evidence.lidar_unknown_mass,
         )
+        radar_mass = (
+            evidence.radar_occ_mass,
+            evidence.radar_free_mass,
+            evidence.radar_unknown_mass,
+        )
         if not evidence.seen_depth:
             depth_mass = (0.0, 0.0, 1.0)
         if not evidence.seen_lidar:
             lidar_mass = (0.0, 0.0, 1.0)
-        return self.combine_ds_masses(depth_mass, lidar_mass)
+        if not evidence.seen_radar:
+            radar_mass = (0.0, 0.0, 1.0)
+
+        combined = self.combine_ds_masses(depth_mass, lidar_mass)
+        combined_tuple = (
+            combined["belief_occupied"],
+            combined["belief_free"],
+            combined["unknown"],
+        )
+    
+        return self.combine_ds_masses(combined_tuple, radar_mass)
 
     def combine_ds_masses(
         self, first: tuple[float, float, float], second: tuple[float, float, float]
@@ -889,13 +1029,16 @@ class LidarDepthFusionNode(Node):
                     candidate_state = self.compute_fusion_output(
                         fusion_state["depth_state"],
                         fusion_state["lidar_state"],
+                        fusion_state["radar_state"],
                         float(near_field_radius),
                         float(lidar_growth),
                     )
                     candidate_state["depth_state"] = fusion_state["depth_state"]
                     candidate_state["lidar_state"] = fusion_state["lidar_state"]
+                    candidate_state["radar_state"] = fusion_state["radar_state"]
                     candidate_state["depth_points"] = fusion_state["depth_points"]
                     candidate_state["lidar_points"] = fusion_state["lidar_points"]
+                    candidate_state["radar_points"] = fusion_state["radar_points"]
                     candidate_state["near_field_radius"] = float(near_field_radius)
                     candidate_state["lidar_growth"] = float(lidar_growth)
                     fusion_states_by_shape[state_key] = candidate_state

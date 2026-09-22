@@ -128,6 +128,7 @@ def launch_setup(context, *args, **kwargs):
 
     odom_topic_full = f'/drone_{drone_id}_{odom_topic}'
     lidar_topic_full = f'/drone_{drone_id}_lidar/points'
+    radar_topic_full = f'/drone_{drone_id}_radar/points'
     fused_topic_full = f'/drone_{drone_id}_fusion/fused_cloud'
     feedback_topic_full = f'/drone_{drone_id}_fusion/closed_loop_feedback'
     cloud_topic = 'fusion/fused_cloud' if use_fusion_value else 'pcl_render_node/cloud'
@@ -310,6 +311,31 @@ def launch_setup(context, *args, **kwargs):
         condition=IfCondition(use_fusion),
     )
 
+    simulated_mmwave_radar_node = Node(
+        package='ego_planner',
+        executable='simulated_mmwave_radar_cloud.py',
+        name=f'drone_{drone_id}_simulated_mmwave_radar',
+        output='screen',
+        parameters=[
+            {'global_cloud_topic': '/map_generator/global_cloud'},
+            {'dynamic_cloud_topic': dynamic_obstacles_topic},
+            {'dynamic_cloud_timeout_sec': 0.5},
+            {'odom_topic': odom_topic_full},
+            {'radar_points_topic': radar_topic_full},
+            {'frame_id': 'world'},
+            {'publish_rate': 10.0},
+            {'max_range': 10.0},
+            {'horizontal_fov_deg': 120.0},
+            {'vertical_min_deg': -12.0},
+            {'vertical_max_deg': 12.0},
+            {'voxel_size': 0.25},
+            {'keep_ratio': 0.65},
+            {'noise_std': 0.03},
+            {'force_zero_stamp': True},
+        ],
+        condition=IfCondition(use_fusion),
+    )
+
     fusion_process = ExecuteProcess(
         cmd=[
             fusion_python_executable, fusion_script,
@@ -382,6 +408,12 @@ def launch_setup(context, *args, **kwargs):
             '-p', f'adaptive_ds_conflict_weight:={adaptive_ds_conflict_weight}',
             '-p', f'adaptive_ds_unknown_ref:={adaptive_ds_unknown_ref}',
             '-p', f'adaptive_ds_conflict_ref:={adaptive_ds_conflict_ref}',
+            '-p', f'radar_cloud_topic:={radar_topic_full}',
+            '-p', 'radar_cloud_timeout_sec:=0.35',
+            '-p', 'radar_max_range:=10.0',
+            '-p', 'radar_growth:=6.0',
+            '-p', 'radar_dynamic_bonus:=0.02',
+            '-p', 'radar_requires_geometry_support:=True',
         ],
         output='screen',
         condition=IfCondition(use_fusion),
@@ -415,6 +447,7 @@ def launch_setup(context, *args, **kwargs):
         traj_server_node,
         dynamic_obstacle_node,
         simulated_lidar_node,
+        simulated_mmwave_radar_node,
         closed_loop_feedback_process,
         fusion_process,
         simulator_include,
